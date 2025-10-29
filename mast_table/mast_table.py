@@ -13,6 +13,7 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
 from mast_table import validate
+from mast_table.backend import get_backend
 from astroquery.mast import MastMissions
 
 __all__ = [
@@ -75,7 +76,7 @@ class MastTable(VuetifyTemplate):
     table = None
     row_select_callbacks = []
 
-    def __init__(self, table, app=None, update_viewport=True, unique_column=None, **kwargs):
+    def __init__(self, table, app=None, backend=None, update_viewport=True, unique_column=None, **kwargs):
         """
         Parameters
         ----------
@@ -105,12 +106,18 @@ class MastTable(VuetifyTemplate):
         super().__init__(**kwargs)
         self.popout_button = PopoutButton(self)
 
-        self.table = table
-        self.app = app
+        if isinstance(backend, str):
+            backend_class = get_backend(backend)
+            self.backend = backend_class(table, **kwargs)
+            self.table = self.backend.table
+        else:
+            self.backend = None
+            self.table = table
 
-        self.items = serialize(table)
-        self.mission = validate.detect_mission_or_products(table)
-        columns = table.colnames
+        self.app = app
+        self.items = serialize(self.table)
+        self.mission = validate.detect_mission_or_products(self.table)
+        columns = self.table.colnames
         self.column_descriptions = validate.get_column_descriptions(self.mission)
 
         self._set_item_key(columns, unique_column)
@@ -129,7 +136,7 @@ class MastTable(VuetifyTemplate):
         if update_viewport and self.app is not None:
             ra_column, dec_column = 'ra', 'dec'
 
-            if ra_column not in table.colnames:
+            if ra_column not in columns:
                 ra_column, dec_column = 'targ_ra', 'targ_dec'
 
             center_coord = SkyCoord(
@@ -212,7 +219,7 @@ class MastTable(VuetifyTemplate):
         with viz.batch_load():
             for filename in self.selected_rows_table['filename']:
                 _download_from_mast(filename)
-                viz.load_data(filename)
+                viz.load(filename)
 
         orientation = viz.plugins['Orientation']
         orientation.align_by = 'WCS'
@@ -249,7 +256,6 @@ def _download_from_mast(product_file_name):
         # support load from cache without query to MM
         return
 
-    # temporarily support JWST and HST until Roman is also available:
     if product_file_name.startswith('jw'):
         mission = 'jwst'
     elif product_file_name.startswith('r'):
