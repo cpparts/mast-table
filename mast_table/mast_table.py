@@ -38,11 +38,13 @@ def serialize(table):
 
 
 known_unique_mast_table_cols = [
-    'fileSetName',  # data products from Missions Mast
+    'fileSetName',  # data products from astroquery.mast.MastMissions
     'source_id',    # Gaia
     'MatchID',      # Hubble Source Catalog
     'objID',        # PanSTARRS,
     'product_key',  # list_products queries
+    'obs_id',       # astroquery.mast.Observations,
+    'sci_data_set_name',  # HST
 ]
 
 
@@ -127,10 +129,12 @@ class MastTable(VuetifyTemplate):
         _table_widgets[len(_table_widgets)] = self
 
         if update_viewport and self.app is not None:
-            ra_column, dec_column = 'ra', 'dec'
-
-            if ra_column not in table.colnames:
-                ra_column, dec_column = 'targ_ra', 'targ_dec'
+            ra_dec_colnames = dict(
+                hst=['sci_ra', 'sci_dec'],
+                roman=['ra_ref', 'dec_ref'],
+                jwst=['targ_ra', 'targ_def'],
+            )
+            ra_column, dec_column = ra_dec_colnames[self.mission]
 
             center_coord = SkyCoord(
                 ra=table[ra_column][0] * u.deg,
