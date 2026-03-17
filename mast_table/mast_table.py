@@ -212,7 +212,7 @@ class MastTable(VuetifyTemplate):
         with viz.batch_load():
             for filename in self.selected_rows_table['filename']:
                 _download_from_mast(filename)
-                viz.load_data(filename)
+                viz.load(filename)
 
         orientation = viz.plugins['Orientation']
         orientation.align_by = 'WCS'
