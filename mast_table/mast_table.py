@@ -4,7 +4,7 @@ import warnings
 
 from traitlets import List, Unicode, Bool, Int, Any, observe
 from ipypopout import PopoutButton
-from ipyvuetify import VuetifyTemplate
+#from ipyvuetify import VuetifyTemplate
 from ipywidgets.widgets import widget_serialization
 
 import numpy as np
@@ -14,6 +14,9 @@ from astropy.table import Table
 
 from mast_table import validate
 from astroquery.mast import MastMissions
+from mast_table.app import SelectableDataFrame, CrossFilterInspector
+import solara
+import pandas as pd
 
 __all__ = [
     'MastTable',
@@ -48,34 +51,10 @@ known_unique_mast_table_cols = [
 ]
 
 
-class MastTable(VuetifyTemplate):
+class MastTable():#VuetifyTemplate):
     """
     Table widget for observation queries from Mission MAST.
     """
-    template_file = __file__, "mast_table.vue"
-
-    items = List().tag(sync=True)
-    headers_visible = List().tag(sync=True)
-    headers_avail = List().tag(sync=True)
-    show_if_empty = Bool(True).tag(sync=True)
-    show_rowselect = Bool(True).tag(sync=True)
-    selected_rows = List().tag(sync=True)
-    column_descriptions = List().tag(sync=True)
-    multiselect = Bool(True).tag(sync=True)
-    items_per_page = Int(5).tag(sync=True)
-    show_tooltips = Bool(False).tag(sync=True)
-    menu_open = Bool(False).tag(sync=True)
-    clear_btn_lbl = Unicode('Clear Table').tag(sync=True)
-    popout_button = Any().tag(sync=True, **widget_serialization)
-    enable_load_in_app = Bool(False).tag(sync=True)
-    mission = Unicode().tag(sync=True)
-
-    # item_key is a column of the table with unique values
-    # for each row, enabling selection of the row by lookup
-    item_key = Unicode().tag(sync=True)
-
-    table = None
-    row_select_callbacks = []
 
     def __init__(self, table, app=None, update_viewport=True, unique_column=None, **kwargs):
         """
@@ -105,7 +84,7 @@ class MastTable(VuetifyTemplate):
         """
 
         super().__init__(**kwargs)
-        self.popout_button = PopoutButton(self)
+
 
         self.table = table
         self.app = app
@@ -125,6 +104,7 @@ class MastTable(VuetifyTemplate):
             columns.remove('s_region')
 
         self.headers_visible = columns
+        self.selected_indices = solara.reactive([])
 
         _table_widgets[len(_table_widgets)] = self
 
@@ -194,27 +174,25 @@ class MastTable(VuetifyTemplate):
                 f"item_key '{item_key}' not found in table columns: {table_columns}"
             )
 
-    @observe('selected_rows')
-    def _on_row_selection(self, msg={}):
-        for func in self.row_select_callbacks:
-            func(msg)
-
     @property
     def selected_rows_table(self):
         """
         `~astropy.table.Table` of only the selected rows.
         """
-        return Table(self.selected_rows)
+        df = self.table.to_pandas()
+        return Table.from_pandas(df.loc[self.selected_indices.value])
 
-    def vue_open_selected_rows_in_jdaviz(self, *args):
+    def open_selected_rows_in_jdaviz(self):#, selected_df: Table):
         from jdaviz import Imviz
         from jdaviz.configs.imviz.helper import _current_app as viz
+
+        selected_df = self.selected_rows_table
 
         if viz is None:
             viz = Imviz()
 
         with viz.batch_load():
-            for filename in self.selected_rows_table['filename']:
+            for filename in selected_df['filename']:
                 _download_from_mast(filename)
                 viz.load(filename)
 
@@ -232,21 +210,94 @@ class MastTable(VuetifyTemplate):
 
         return viz
 
-    def vue_open_selected_rows_in_aladin(self, *args):
+    def open_selected_rows_in_aladin(self):
         from mast_aladin.app import gca
+
+        selected_df = self.selected_rows_table
 
         mal = gca()
 
-        for filename in self.selected_rows_table['filename']:
+        for filename in selected_df['filename']:
             _download_from_mast(filename)
             mal.delayed_add_fits(filename)
 
         return mal
 
-    @observe('mission')
-    def _on_mission_update(self, msg={}):
-        self.enable_load_in_app = msg['new'] == 'list_products'
+@solara.component
+def MastTableCrossFiltered(
+    mast_table: MastTable,
+    df: pd.DataFrame,
+    items_per_page: int = 10,
+):
+    filter, set_filter = solara.use_cross_filter(id(df), "mast-table")
 
+    selected_indices = mast_table.selected_indices.value
+
+    solara.use_effect(
+        lambda: (
+            set_filter(None)
+            if not selected_indices
+            else set_filter(df.index.isin(selected_indices))
+        ),
+        [tuple(selected_indices)],
+    )
+
+    # Apply incoming filters
+    if filter is not None:
+        dff = df[filter]
+    else:
+        dff = df
+
+    solara.Info(f"Showing {len(dff)} of {len(df)} rows")
+
+    SelectableDataFrame(
+        dff,
+        items_per_page=items_per_page,
+        selected_indices=selected_indices,
+        set_selected_indices=lambda indices: mast_table.selected_indices.set(indices),
+    )
+
+    if mast_table.mission == "list_products":
+        with solara.Row():
+            solara.Button(
+                "Open in Aladin",
+                disabled=(len(selected_indices) == 0),
+                on_click=lambda:mast_table.open_selected_rows_in_aladin(),
+            )
+            solara.Button(
+                "Open in Jdaviz",
+                disabled=(len(selected_indices) == 0),
+                on_click=lambda: mast_table.open_selected_rows_in_jdaviz(),
+            )
+
+
+@solara.component
+def MastTablePage(mast_table: MastTable):
+    solara.provide_cross_filter()
+
+    df = mast_table.table.to_pandas()[mast_table.headers_visible]
+
+    with solara.Column():
+        solara.Markdown("## MAST Table Viewer (Cross-Filtered)")
+        solara.Markdown(
+            "Select rows with the checkboxes to filter the other widgets. "
+            "Use the dropdown to filter what shows up in the table."
+        )
+
+        #with solara.Row():
+            #solara.CrossFilterReport(df)
+            #solara.CrossFilterSelect(df,"fileSetName")
+            #solara.CrossFilterSlider(df,"targ_ra")
+            #solara.CrossFilterSelect(df,"productLevel")
+
+        with solara.Row():
+            with solara.Column():
+                solara.CrossFilterReport(df)
+            with solara.Column():
+                MastTableCrossFiltered(mast_table, df)
+
+        with solara.Row():
+            CrossFilterInspector(df)
 
 def _download_from_mast(product_file_name):
     if os.path.exists(product_file_name):
