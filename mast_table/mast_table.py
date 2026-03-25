@@ -2,11 +2,6 @@
 import os
 import warnings
 
-from traitlets import List, Unicode, Bool, Int, Any, observe
-from ipypopout import PopoutButton
-#from ipyvuetify import VuetifyTemplate
-from ipywidgets.widgets import widget_serialization
-
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -41,17 +36,17 @@ def serialize(table):
 
 
 known_unique_mast_table_cols = [
-    'fileSetName',  # data products from astroquery.mast.MastMissions
-    'source_id',    # Gaia
-    'MatchID',      # Hubble Source Catalog
-    'objID',        # PanSTARRS,
-    'product_key',  # list_products queries
-    'obs_id',       # astroquery.mast.Observations,
-    'sci_data_set_name',  # HST
+    'fileSetName',      # data products from astroquery.mast.MastMissions
+    'source_id',        # Gaia
+    'MatchID',          # Hubble Source Catalog
+    'objID',            # PanSTARRS,
+    'product_key',      # list_products queries
+    'obs_id',           # astroquery.mast.Observations,
+    'sci_data_set_name',# HST
 ]
 
 
-class MastTable():#VuetifyTemplate):
+class MastTable():
     """
     Table widget for observation queries from Mission MAST.
     """
@@ -84,7 +79,6 @@ class MastTable():#VuetifyTemplate):
         """
 
         super().__init__(**kwargs)
-
 
         self.table = table
         self.app = app
@@ -182,7 +176,7 @@ class MastTable():#VuetifyTemplate):
         df = self.table.to_pandas()
         return Table.from_pandas(df.loc[self.selected_indices.value])
 
-    def open_selected_rows_in_jdaviz(self):#, selected_df: Table):
+    def open_selected_rows_in_jdaviz(self):
         from jdaviz import Imviz
         from jdaviz.configs.imviz.helper import _current_app as viz
 
@@ -275,6 +269,8 @@ def MastTableCrossFiltered(
 def MastTablePage(mast_table: MastTable):
     solara.provide_cross_filter()
 
+    # by default, remove the `s_region`` column
+    # from the visible columns in the widget:
     df = mast_table.table.to_pandas()[mast_table.headers_visible]
 
     with solara.Column():
@@ -284,11 +280,12 @@ def MastTablePage(mast_table: MastTable):
             "Use the dropdown to filter what shows up in the table."
         )
 
-        #with solara.Row():
-            #solara.CrossFilterReport(df)
-            #solara.CrossFilterSelect(df,"fileSetName")
-            #solara.CrossFilterSlider(df,"targ_ra")
-            #solara.CrossFilterSelect(df,"productLevel")
+        if mast_table.mission == "list_products":
+            with solara.Row():
+                solara.CrossFilterSelect(df,"file_suffix")
+        else:
+            with solara.Row():
+                solara.CrossFilterSelect(df,"productLevel")
 
         with solara.Row():
             with solara.Column():

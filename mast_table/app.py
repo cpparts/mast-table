@@ -8,7 +8,7 @@ Run with:
     solara run nogit/cross_filter_demo.py
 """
 
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List
 
 import numpy as np
 import pandas as pd
