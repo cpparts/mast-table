@@ -65,21 +65,19 @@ def SelectableDataFrame(
             indices = [item["_solara_index"] for item in new_selected]
             set_selected_indices(indices)
 
-    with solara.Div(style={"overflow-x": "auto", "width": "40%"}):
-        with solara.Div(style={"min-width": "1200px"}):
-            v.DataTable(
-                headers=headers,
-                items=items,
-                item_key="_solara_index",
-                v_model=selected_items,
-                on_v_model=handle_input,
-                show_select=True,
-                items_per_page=items_per_page,
-                page=page,
-                on_page=set_page,
-                dense=True,
-                style_="min-width: 1200px;",
-            )
+    v.DataTable(
+        headers=headers,
+        items=items,
+        item_key="_solara_index",
+        v_model=selected_items,
+        on_v_model=handle_input,
+        show_select=True,
+        items_per_page=items_per_page,
+        page=page,
+        on_page=set_page,
+        dense=True,
+        style_="min-width: 1200px;",
+    )
 
 
 @solara.component

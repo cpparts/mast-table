@@ -287,11 +287,26 @@ def MastTablePage(mast_table: MastTable):
             with solara.Row():
                 solara.CrossFilterSelect(df,"productLevel")
 
-        with solara.Row():
-            with solara.Column():
+        with solara.Row(style={"width": "100%"}):
+            with solara.Column(
+                style={
+                    "max-width": "50px",
+                }
+            ):
                 solara.CrossFilterReport(df)
-            with solara.Column():
-                MastTableCrossFiltered(mast_table, df)
+            with solara.Column(
+                style={
+                    "min-width": "0",
+                }
+            ):
+                with solara.Div(style={
+                    "overflow-x": "auto",
+                    "width": "100%",
+                }):
+                    with solara.Div(style={
+                        "min-width": "max-content",
+                    }):
+                        MastTableCrossFiltered(mast_table, df)
 
         with solara.Row():
             CrossFilterInspector(df)
