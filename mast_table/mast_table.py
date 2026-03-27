@@ -36,13 +36,13 @@ def serialize(table):
 
 
 known_unique_mast_table_cols = [
-    'fileSetName',      # data products from astroquery.mast.MastMissions
-    'source_id',        # Gaia
-    'MatchID',          # Hubble Source Catalog
-    'objID',            # PanSTARRS,
-    'product_key',      # list_products queries
-    'obs_id',           # astroquery.mast.Observations,
-    'sci_data_set_name',# HST
+    'fileSetName',          # data products from astroquery.mast.MastMissions
+    'source_id',            # Gaia
+    'MatchID',              # Hubble Source Catalog
+    'objID',                # PanSTARRS,
+    'product_key',          # list_products queries
+    'obs_id',               # astroquery.mast.Observations,
+    'sci_data_set_name',    # HST
 ]
 
 
@@ -217,6 +217,7 @@ class MastTable():
 
         return mal
 
+
 @solara.component
 def MastTableCrossFiltered(
     mast_table: MastTable,
@@ -256,7 +257,7 @@ def MastTableCrossFiltered(
             solara.Button(
                 "Open in Aladin",
                 disabled=(len(selected_indices) == 0),
-                on_click=lambda:mast_table.open_selected_rows_in_aladin(),
+                on_click=lambda: mast_table.open_selected_rows_in_aladin(),
             )
             solara.Button(
                 "Open in Jdaviz",
@@ -282,10 +283,10 @@ def MastTablePage(mast_table: MastTable):
 
         if mast_table.mission == "list_products":
             with solara.Row():
-                solara.CrossFilterSelect(df,"file_suffix")
+                solara.CrossFilterSelect(df, "file_suffix")
         else:
             with solara.Row():
-                solara.CrossFilterSelect(df,"productLevel")
+                solara.CrossFilterSelect(df, "productLevel")
 
         with solara.Row(style={"width": "100%"}):
             with solara.Column(
@@ -310,6 +311,7 @@ def MastTablePage(mast_table: MastTable):
 
         with solara.Row():
             CrossFilterInspector(df)
+
 
 def _download_from_mast(product_file_name):
     if os.path.exists(product_file_name):
