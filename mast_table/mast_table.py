@@ -14,6 +14,7 @@ from astropy.table import Table
 
 from mast_table import validate
 from astroquery.mast import MastMissions
+import jdaviz
 
 __all__ = [
     'MastTable',
@@ -207,16 +208,25 @@ class MastTable(VuetifyTemplate):
         return Table(self.selected_rows)
 
     def vue_open_selected_rows_in_jdaviz(self, *args):
-        from jdaviz import Imviz
-        from jdaviz.configs.imviz.helper import _current_app as viz
 
-        if viz is None:
-            viz = Imviz()
+        if jdaviz.gca() is None:
+            jdaviz.new_app()
+
+        viz = jdaviz.gca()
+
+        #image_viewers = viz.app.get_viewers_of_cls('ImvizImageView')
+        #if image_viewers:
+        #    glue_viewer = image_viewers[0]
+        #else:
+        #    raise ValueError(
+        #        "No compatible viewers available in jdaviz. You must "
+        #        "load data with a world coordinate system before using ImvizSyncAdapter."
+        #    )
 
         with viz.batch_load():
             for filename in self.selected_rows_table['filename']:
                 _download_from_mast(filename)
-                viz.load(filename)
+                viz.load(filename, format="Image")
 
         orientation = viz.plugins['Orientation']
         orientation.align_by = 'WCS'
