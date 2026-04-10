@@ -208,20 +208,7 @@ class MastTable(VuetifyTemplate):
         return Table(self.selected_rows)
 
     def vue_open_selected_rows_in_jdaviz(self, *args):
-
-        if jdaviz.gca() is None:
-            jdaviz.new_app()
-
         viz = jdaviz.gca()
-
-        #image_viewers = viz.app.get_viewers_of_cls('ImvizImageView')
-        #if image_viewers:
-        #    glue_viewer = image_viewers[0]
-        #else:
-        #    raise ValueError(
-        #        "No compatible viewers available in jdaviz. You must "
-        #        "load data with a world coordinate system before using ImvizSyncAdapter."
-        #    )
 
         with viz.batch_load():
             for filename in self.selected_rows_table['filename']:
