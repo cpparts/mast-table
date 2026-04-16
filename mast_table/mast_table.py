@@ -14,7 +14,6 @@ from astropy.table import Table
 
 from mast_table import validate
 from astroquery.mast import MastMissions
-import jdaviz
 
 __all__ = [
     'MastTable',
@@ -208,6 +207,8 @@ class MastTable(VuetifyTemplate):
         return Table(self.selected_rows)
 
     def vue_open_selected_rows_in_jdaviz(self, *args):
+        import jdaviz
+
         viz = jdaviz.gca()
 
         with viz.batch_load():
