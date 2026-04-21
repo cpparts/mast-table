@@ -207,16 +207,14 @@ class MastTable(VuetifyTemplate):
         return Table(self.selected_rows)
 
     def vue_open_selected_rows_in_jdaviz(self, *args):
-        from jdaviz import Imviz
-        from jdaviz.configs.imviz.helper import _current_app as viz
+        import jdaviz
 
-        if viz is None:
-            viz = Imviz()
+        viz = jdaviz.gca()
 
         with viz.batch_load():
             for filename in self.selected_rows_table['filename']:
                 _download_from_mast(filename)
-                viz.load(filename)
+                viz.load(filename, format="Image")
 
         orientation = viz.plugins['Orientation']
         orientation.align_by = 'WCS'
