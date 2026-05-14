@@ -93,7 +93,7 @@ def update_mast_column_lists(update_column_descriptions=True, update_unique_colu
         from mast_table.table import validate
         validate.update_mast_column_lists()
     """
-    from astroquery.mast.missions import MastMissions
+    from astroquery.mast import MastMissions
 
     mast = MastMissions()
 
