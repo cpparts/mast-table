@@ -1,8 +1,7 @@
 import operator
-from typing import List, Optional, cast, Callable
+from typing import List, Optional, Callable
 
 import functools
-
 import uuid
 
 import numpy as np
@@ -14,53 +13,51 @@ import reacton.ipyvuetify as v
 
 from astropy.table import Table, join
 from mast_table.mast_table import MastTable, serialize, col_unique_row_index
+from mast_table.cross_filter.utils import (
+    table_py_types, table_value_count, table_filter_values,
+    table_range, slide_or_select
+)
 
 
-def py_type(dtype):
-    kind = dtype.kind.lower()
-    if kind in "iu":
-        return int
-    elif kind == "f":
-        return float
-    elif kind == "b":
-        return bool
-    return dtype
-
-
-def table_py_types(table):
-    return {
-        column: py_type(dtype)
-        for column, (dtype, _) in table.dtype.fields.items()
-    }
-
-
-def use_table_column_names(table) -> List[str]:
-    """Return a list of column names from a table."""
-    return table.colnames
-
-
-def table_value_count(table, column, limit: int):
-    return Table(
-        data=[{'value': str(group[column][0]), 'count': len(group[column])}
-              for i, group in enumerate(table.group_by(column).groups)
-              if i < limit]
+@solara.component
+def FilterModeButtons(
+    mode,
+    set_mode,
+):
+    with solara.ToggleButtonsSingle(
+        value=mode,
+        on_value=set_mode,
+    ):
+        solara.Button(
+            icon_name="mdi-code-equal",
+            icon=True,
+            value="==",
         )
-
-
-def table_filter_values(table, column, values, invert=False):
-    filter = np.isin(
-        table[column].astype(str),
-        np.asarray(values).astype(str),
-    )
-
-    if invert:
-        filter = ~filter
-
-    return filter
-
-
-def table_range(table, column):
-    return table[column].min().tolist(), table[column].max().tolist()
+        solara.Button(
+            icon_name="mdi-code-not-equal",
+            icon=True,
+            value="!=",
+        )
+        solara.Button(
+            icon_name="mdi-code-less-than",
+            icon=True,
+            value="<",
+        )
+        solara.Button(
+            icon_name="mdi-code-less-than-or-equal",
+            icon=True,
+            value="<=",
+        )
+        solara.Button(
+            icon_name="mdi-code-greater-than",
+            icon=True,
+            value=">",
+        )
+        solara.Button(
+            icon_name="mdi-code-greater-than-or-equal",
+            icon=True,
+            value=">=",
+        )
 
 
 @solara.component
@@ -229,47 +226,6 @@ def CrossFilterSelect(
 
 
 @solara.component
-def FilterModeButtons(
-    mode,
-    set_mode,
-):
-    with solara.ToggleButtonsSingle(
-        value=mode,
-        on_value=set_mode,
-    ):
-        solara.Button(
-            icon_name="mdi-code-equal",
-            icon=True,
-            value="==",
-        )
-        solara.Button(
-            icon_name="mdi-code-not-equal",
-            icon=True,
-            value="!=",
-        )
-        solara.Button(
-            icon_name="mdi-code-less-than",
-            icon=True,
-            value="<",
-        )
-        solara.Button(
-            icon_name="mdi-code-less-than-or-equal",
-            icon=True,
-            value="<=",
-        )
-        solara.Button(
-            icon_name="mdi-code-greater-than",
-            icon=True,
-            value=">",
-        )
-        solara.Button(
-            icon_name="mdi-code-greater-than-or-equal",
-            icon=True,
-            value=">=",
-        )
-
-
-@solara.component
 def CrossFilterSlider(
     table,
     column: str,
@@ -405,49 +361,6 @@ def CrossFilterSlider(
 
 
 @solara.component
-def CrossFilterReport(table, classes: List[str] = []):
-    """Shows a report of the current cross filter state.
-
-    Shows number of rows filtered, and the total number of rows.
-
-    See [use_cross_filter](/documentation/api/hooks/use_cross_filter)
-    for more information about how to use cross filtering.
-
-    ## Arguments
-
-    - `df`: The table where the filter is applied to.
-    - `classes`: Additional CSS classes to add to the main widget.
-
-    """
-    filter, set_filter = solara.use_cross_filter(id(table), "summary")
-    table_filtered = table
-    filtered = False
-    if filter is not None:
-        filtered = True
-        table_filtered = table[filter]
-    progress = len(table_filtered) / len(table) * 100
-    with solara.VBox(classes=classes) as main:
-        with solara.HBox(align_items="center"):
-            icon = "mdi-filter"
-            v.Icon(
-                children=[icon],
-                style_="opacity: 0.1" if not filtered else ""
-            )
-            if filtered:
-                summary = f"{len(table_filtered):,} / {len(table):,}"
-            else:
-                summary = f"{len(table_filtered):,}"
-            v.Html(tag="h3", children=[summary], style_="display: inline")
-        # always add a progress bar to make sure the layout is the same
-        if filtered:
-            v.ProgressLinear(value=progress).key("visible")
-        else:
-            v.ProgressLinear(value=0, style_="visibility: hidden").key("hidden")
-
-    return main
-
-
-@solara.component
 def SelectableTable(
     table,
     items_per_page: int = 10,
@@ -491,58 +404,6 @@ def SelectableTable(
     )
 
     display(mast_table)
-
-
-@solara.component
-def CrossFilterSelectableTable(
-    table,
-    items_per_page: int = 10
-):
-    """A selectable table that participates in cross-filtering.
-
-    * Incoming cross-filters from other components narrow which rows
-      are shown.
-    * When the user checks rows, a filter is set so that *other*
-      cross-filter consumers only see the selected rows.
-    """
-    filter, set_filter = solara.use_cross_filter(id(table), "selectable-table")
-
-    # Apply incoming cross-filter
-    if filter is not None:
-        table_filtered = table[filter]
-    else:
-        table_filtered = table
-
-    def on_selected_indices(indices: List[int]):
-        if not indices:
-            # Nothing selected → don't restrict other components
-            set_filter(None)
-        else:
-            # Build a boolean mask over the *original* table
-            mask = np.isin(table[col_unique_row_index], indices)
-            set_filter(mask)
-
-    SelectableTable(
-        table_filtered,
-        on_selected_indices=on_selected_indices,
-        items_per_page=items_per_page
-    )
-
-
-def slide_or_select(
-    table,
-    column,
-):
-    if not np.issubdtype(table[column].dtype, np.number):
-        return "select"
-    else:
-        nunique_values = len(list(
-            np.unique(table[column].astype(str))
-        ))
-        if nunique_values > 10:
-            return "slider"
-        else:
-            return "select"
 
 
 @solara.component
