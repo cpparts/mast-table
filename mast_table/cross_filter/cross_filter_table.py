@@ -204,7 +204,7 @@ def CrossFilterSelect(
                                             )
 
                 label = (
-                    f"Condition = " if not invert else f"Condition != "
+                    "Condition = " if not invert else "Condition != "
                 )
                 Select.element(
                     value=value,
@@ -341,7 +341,7 @@ def CrossFilterSlider(
                     value=filter_value,
                     min=vmin,
                     max=vmax,
-                    step=step_size(vmin,vmax),
+                    step=step_size(vmin, vmax),
                     on_value=set_filter_value,
                     thumb_label=True,
                     tick_labels=False,
@@ -352,7 +352,7 @@ def CrossFilterSlider(
                     value=filter_value,
                     min=vmin,
                     max=vmax,
-                    step=step_size(vmin,vmax),
+                    step=step_size(vmin, vmax),
                     on_value=set_filter_value,
                     thumb_label=True,
                     tick_labels=False,
@@ -375,7 +375,6 @@ def SelectableTable(
     Displays a paginated table with selectable rows.  Reports the
     indices (into *table*) of the currently selected rows.
     """
-    #page, set_page = solara.use_state(1)
     selected, set_selected = solara.use_state([])
 
     # Build vuetify column headers from the table
@@ -445,14 +444,14 @@ def CrossFilterMastTable(observations):
             set_pending_value(vmin)
         else:
             set_pending_value("")
-    
+
     def remove_filter(filter_id):
         set_filters([f for f in filters if f["id"] != filter_id])
 
         updated = dict(filter_masks)
         updated.pop(filter_id, None)
         set_filter_masks(updated)
-    
+
     def set_mask(filter_id, mask):
         updated = dict(filter_masks)
 
@@ -499,7 +498,7 @@ def CrossFilterMastTable(observations):
             )
 
     with solara.Column(
-        style= {
+        style={
             "overflow-y": "auto",
         }
     ):
@@ -543,6 +542,7 @@ def CrossFilterMastTable(observations):
                                 }
                             ):
                                 opt = slide_or_select(observations, f["column"])
+                                initial_val = f["value"] if f.get("value") is not None else None
                                 if opt == "slider":
                                     CrossFilterSlider(
                                         observations,
@@ -550,7 +550,7 @@ def CrossFilterMastTable(observations):
                                         filter_id=f["id"],
                                         set_mask=set_mask,
                                         mode=f["mode"],
-                                        initial_value=f["value"] if f.get("value") is not None else None,
+                                        initial_value=initial_val,
                                     )
                                 else:
                                     CrossFilterSelect(
@@ -558,13 +558,13 @@ def CrossFilterMastTable(observations):
                                         f["column"],
                                         filter_id=f["id"],
                                         set_mask=set_mask,
-                                        initial_values=[f["value"]] if f.get("value") is not None else None,
+                                        initial_values=initial_val,
                                     )
                                 with solara.Row(justify="end"):
                                     solara.Button(
                                         icon_name="mdi-close",
                                         on_click=lambda id=f["id"]: remove_filter(id),
-                                        style={"background-color": "#013b4d","color":"white"}
+                                        style={"background-color": "#013b4d", "color": "white"}
                                     )
                     if not len(filters):
                         solara.Markdown("No active conditions")
@@ -610,7 +610,7 @@ def CrossFilterMastTable(observations):
                                 value=int(pending_value),
                                 min=int(vmin),
                                 max=int(vmax),
-                                step=step_size(vmin,vmax),
+                                step=step_size(vmin, vmax),
                                 on_value=set_pending_value,
                                 thumb_label=False,
                                 tick_labels=False,
@@ -622,7 +622,7 @@ def CrossFilterMastTable(observations):
                                 value=float(pending_value),
                                 min=float(vmin),
                                 max=float(vmax),
-                                step=step_size(vmin,vmax),
+                                step=step_size(vmin, vmax),
                                 on_value=set_pending_value,
                                 thumb_label=False,
                                 tick_labels=False,
@@ -645,7 +645,7 @@ def CrossFilterMastTable(observations):
                             label="Apply condition",
                             icon_name="mdi-plus",
                             on_click=lambda *args: add_filter(),
-                            style={"background-color": "#013b4d","color":"white"}
+                            style={"background-color": "#013b4d", "color": "white"}
                         )
 
             with solara.Column(style="flex: 1; overflow: auto; min-height: 0"):
