@@ -1,6 +1,7 @@
 from typing import List
 import numpy as np
 from astropy.table import Table
+import math
 
 
 def py_type(dtype):
@@ -64,3 +65,13 @@ def slide_or_select(
             return "slider"
         else:
             return "select"
+
+
+def step_size(
+    vmin,
+    vmax
+):
+    rng = vmax-vmin
+    step = rng/5 if rng <= 1 else 0.1
+    decimals = max(0, int(-math.floor(math.log10(step)))) if step < 1 else 0
+    return round(step, decimals)
