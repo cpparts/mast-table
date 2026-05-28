@@ -15,7 +15,7 @@ from astropy.table import Table, join
 from mast_table.mast_table import MastTable, serialize, col_unique_row_index
 from mast_table.cross_filter.utils import (
     table_py_types, table_value_count, table_filter_values,
-    table_range, slide_or_select
+    table_range, slide_or_select, step_size
 )
 
 
@@ -341,6 +341,7 @@ def CrossFilterSlider(
                     value=filter_value,
                     min=vmin,
                     max=vmax,
+                    step=step_size(vmin,vmax),
                     on_value=set_filter_value,
                     thumb_label=True,
                     tick_labels=False,
@@ -349,7 +350,9 @@ def CrossFilterSlider(
                 solara.SliderFloat(
                     label="",
                     value=filter_value,
-                    min=vmin, max=vmax,
+                    min=vmin,
+                    max=vmax,
+                    step=step_size(vmin,vmax),
                     on_value=set_filter_value,
                     thumb_label=True,
                     tick_labels=False,
@@ -607,6 +610,7 @@ def CrossFilterMastTable(observations):
                                 value=int(pending_value),
                                 min=int(vmin),
                                 max=int(vmax),
+                                step=step_size(vmin,vmax),
                                 on_value=set_pending_value,
                                 thumb_label=False,
                                 tick_labels=False,
@@ -618,6 +622,7 @@ def CrossFilterMastTable(observations):
                                 value=float(pending_value),
                                 min=float(vmin),
                                 max=float(vmax),
+                                step=step_size(vmin,vmax),
                                 on_value=set_pending_value,
                                 thumb_label=False,
                                 tick_labels=False,
