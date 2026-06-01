@@ -15,7 +15,7 @@ from astropy.table import Table, join
 from mast_table.mast_table import MastTable, serialize, col_unique_row_index
 from mast_table.cross_filter.utils import (
     table_py_types, table_value_count, table_filter_values,
-    table_range, slide_or_select, step_size
+    table_range, slide_or_select, step_size, build_select_items,
 )
 
 
@@ -101,6 +101,15 @@ def CrossFilterSelect(
     )
     invert, set_invert = solara.use_state_or_update(invert)
     multiple, set_multiple = solara.use_state_or_update(multiple)
+
+    def clear_not_multiple():
+        if not multiple and len(filter_values) > 1:
+            set_filter_values([filter_values[0]])
+
+    solara.use_effect(
+        clear_not_multiple,
+        [multiple]
+    )
 
     table_filtered = table
 
@@ -601,6 +610,7 @@ def CrossFilterMastTable(observations):
                     )
 
                     opt = slide_or_select(observations, pending_column)
+                    fully_masked = False
 
                     # creating slide/select based on column user selects
                     if opt == "slider":
@@ -653,8 +663,8 @@ def CrossFilterMastTable(observations):
                             )
 
                     else:
-                        unique_values = list(
-                            np.unique(observations[pending_column].astype(str))
+                        unique_values, fully_masked = build_select_items(
+                            observations[pending_column]
                         )
 
                         v.Select(
@@ -669,8 +679,12 @@ def CrossFilterMastTable(observations):
                             label="Apply condition",
                             icon_name="mdi-plus",
                             on_click=lambda *args: add_filter(),
+                            disabled=fully_masked,
                             style={"background-color": "#00627e", "color": "white"}
                         )
+                    if fully_masked:
+                        with solara.Row(justify="end"):
+                            solara.Markdown("(Column fully masked)")
 
             with solara.Column(style="flex: 1; overflow: auto; min-height: 0"):
                 filtered_table = (
