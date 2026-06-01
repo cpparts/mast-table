@@ -89,6 +89,11 @@ def CrossFilterSelect(
     - `classes`: Additional CSS classes to add to the main widget.
 
     """
+    if initial_values is None:
+        initial_values = []
+    elif isinstance(initial_values, str):
+        initial_values = [initial_values]
+
     filter_values, set_filter_values = solara.use_state(initial_values or [])
     solara.use_effect(
         lambda: set_filter_values(initial_values or []),
@@ -177,6 +182,7 @@ def CrossFilterSelect(
             }):
                 solara.Markdown(f"**{column}**")
 
+                # creating settings menu
                 if configurable:
                     v_slots = [{"name": "activator", "variable": "x", "children": btn}]
                     with solara.Div(
@@ -203,6 +209,7 @@ def CrossFilterSelect(
                                                 label="Select multiple"
                                             )
 
+                # creating selection dropdown
                 label = (
                     "Condition = " if not invert else "Condition != "
                 )
@@ -309,6 +316,8 @@ def CrossFilterSlider(
                 }
             ):
                 solara.Markdown(f"**{column}**")
+
+                # creating settings menu
                 if configurable:
                     with solara.Div(
                         style={
@@ -335,6 +344,8 @@ def CrossFilterSlider(
                                                 set_mode=set_mode,
                                             )
                 solara.Markdown(label)
+
+            # creating slider
             if issubclass(py_types[column], (int, np.integer)):
                 solara.SliderInt(
                     label="",
@@ -410,6 +421,14 @@ def SelectableTable(
 
 @solara.component
 def CrossFilterMastTable(observations):
+    """A selectable table that participates in cross-filtering.
+
+    * Incoming cross-filters from other components narrow which rows
+      are shown.
+    * When the user checks rows, a filter is set so that *other*
+      cross-filter consumers only see the selected rows.
+    * Conditions are set and tracked in a popout window.
+    """
     solara.provide_cross_filter()
 
     pending_column, set_pending_column = solara.use_state(
@@ -480,7 +499,7 @@ def CrossFilterMastTable(observations):
             active_masks
         )
 
-    solara.lab.theme.themes.light.primary = "#013b4d"
+    solara.lab.theme.themes.light.primary = "#00627e"
 
     with v.AppBar(
         color="#b4dbe9",
@@ -503,6 +522,7 @@ def CrossFilterMastTable(observations):
         }
     ):
         with solara.Row():
+            # creating popout conditions panel
             if drawer_open:
                 with solara.Card(
                     style="""
@@ -517,11 +537,11 @@ def CrossFilterMastTable(observations):
                             """
                             .custom-toggle .v-btn {
                                 background-color: transparent# !important;
-                                color: #013b4d !important;
+                                color: #00627e !important;
                             }
 
                             .custom-toggle .v-btn.v-item--active {
-                                background-color: #013b4d !important;
+                                background-color: #00627e !important;
                                 color: white !important;
                             }
                             """
@@ -533,11 +553,13 @@ def CrossFilterMastTable(observations):
                             on_value=set_pending_reducer,
                             classes=["custom-toggle"],
                         )
+
+                    # creating slide/select for each active condition
                     for i, f in enumerate(filters):
                         with solara.Row(style={"width": "100%"}):
                             with solara.Card(
                                 style={
-                                    "border": "2px solid #013b4d",
+                                    "border": "2px solid #00627e",
                                     "box-shadow": "none",
                                 }
                             ):
@@ -564,11 +586,12 @@ def CrossFilterMastTable(observations):
                                     solara.Button(
                                         icon_name="mdi-close",
                                         on_click=lambda id=f["id"]: remove_filter(id),
-                                        style={"background-color": "#013b4d", "color": "white"}
+                                        style={"background-color": "#00627e", "color": "white"}
                                     )
                     if not len(filters):
                         solara.Markdown("No active conditions")
 
+                    # creating add condition section
                     solara.Markdown("##Add condition")
                     v.Select(
                         label="Column",
@@ -579,6 +602,7 @@ def CrossFilterMastTable(observations):
 
                     opt = slide_or_select(observations, pending_column)
 
+                    # creating slide/select based on column user selects
                     if opt == "slider":
                         with solara.Row(
                             style={
@@ -587,7 +611,7 @@ def CrossFilterMastTable(observations):
                                 "flex-wrap": "wrap",
                             }
                         ):
-                            solara.Text("Operator")
+                            solara.Markdown("Operator")
 
                             FilterModeButtons(
                                 mode=pending_mode,
@@ -645,7 +669,7 @@ def CrossFilterMastTable(observations):
                             label="Apply condition",
                             icon_name="mdi-plus",
                             on_click=lambda *args: add_filter(),
-                            style={"background-color": "#013b4d", "color": "white"}
+                            style={"background-color": "#00627e", "color": "white"}
                         )
 
             with solara.Column(style="flex: 1; overflow: auto; min-height: 0"):
