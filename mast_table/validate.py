@@ -90,7 +90,7 @@ def update_mast_column_lists(update_column_descriptions=True, update_unique_colu
 
     To update the cached columns, run:
 
-        from mast_table.table import validate
+        from mast_table import validate
         validate.update_mast_column_lists()
     """
     from astroquery.mast import MastMissions

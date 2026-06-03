@@ -26,6 +26,31 @@
             "name": "sci_haspnum"
         },
         {
+            "data_type": "boolean",
+            "description": "Reports if there are any Hubble Spectroscopic Legacy Archive. (HSLA), enter 0 for no, 1 for yes",
+            "name": "sci_hslanum"
+        },
+        {
+            "data_type": "string",
+            "description": "HSLA astronomical object type: broad top-level type in the classification hierarchy. Derived from SIMBAD crossmatch, NED crossmatch, or HST Phase II proposal keywords.",
+            "name": "sci_hsla_tier1"
+        },
+        {
+            "data_type": "string",
+            "description": "HSLA astronomical object type: mid-level type in the classification hierarchy. Derived from SIMBAD crossmatch, NED crossmatch, or HST Phase II proposal keywords.",
+            "name": "sci_hsla_tier2"
+        },
+        {
+            "data_type": "string",
+            "description": "HSLA astronomical object type: specific lowest-level type in the classification hierarchy. Derived from SIMBAD crossmatch, NED crossmatch, or HST Phase II proposal keywords.",
+            "name": "sci_hsla_tier3"
+        },
+        {
+            "data_type": "string",
+            "description": "HSLA astronomical object type: closest Unified Astronomy Thesaurus match to the most specific (tier 3) HSLA object type. Derived from SIMBAD crossmatch, NED crossmatch, or HST Phase II proposal keywords.",
+            "name": "sci_hsla_uatmatch"
+        },
+        {
             "data_type": "string",
             "description": "Instrument used    (e.g. ACS, COS, FGS, FOC, FOS, HRS, HSP, NICMOS, STIS, WFC3, WFPC, WFPC2)",
             "name": "sci_instrume"
@@ -304,7 +329,7 @@
         },
         {
             "data_type": "string",
-            "description": "Product levels, 1b is an Uncal FITS file, 2a = Countrate exposure, 2b = calibrated exposure, 2c = cosmic-ray-flagged exposure, and 3 = combined data.",
+            "description": "Product levels, 1b is an uncalibrated FITS file, 2a = countrate exposure, 2b = calibrated (exposure-based), 2bs = calibrated (source-based), 2c = cosmic-ray-flagged (exposure-based), 2cs = cosmic-ray-flagged (source-based), and 3 = combined data.",
             "name": "productLevel"
         },
         {
@@ -534,11 +559,6 @@
         },
         {
             "data_type": "float",
-            "description": "Total duration of the exposure, including dead times; computed as the difference between exposure end and start times; equivalent to keyword DURATION (seconds)",
-            "name": "texptime"
-        },
-        {
-            "data_type": "float",
             "description": "Time of the last data readout within this exposure (Modified Julian Date).  NOTE: This keyword is present for backward compatibility with ground system software. Where possible, use the FITS Standard keyword MJD-END for this quantity",
             "name": "expend"
         },
@@ -630,7 +650,7 @@
         {
             "data_type": "float",
             "description": "ICRS right ascension of guide star",
-            "name": "gs_dra"
+            "name": "gs_ra"
         },
         {
             "data_type": "datetime",
@@ -800,7 +820,7 @@
         {
             "data_type": "string",
             "description": "The name of the APT observation folder in which this observation is contained",
-            "name": "obsfolder"
+            "name": "obsfoldr"
         },
         {
             "data_type": "string",
@@ -814,7 +834,7 @@
         },
         {
             "data_type": "string",
-            "description": "Version number of the Observatory Scheduling Software (OSS)",
+            "description": "Version number of the Operations Scripts Subsystem (OSS) with which the Astronomer's Proposal Tool (APT) output is compatible",
             "name": "oss_ver"
         },
         {
@@ -866,11 +886,6 @@
             "data_type": "string",
             "description": "Identifies the exposure as PRIME, PARALLEL_COORDINATED (same program as the PRIME), or PARALLEL_PURE (different program than the PRIME)",
             "name": "expripar"
-        },
-        {
-            "data_type": "float",
-            "description": "The total exposure time of all the individual pointings included in a resampled/combined product in units of seconds",
-            "name": "texptime"
         },
         {
             "data_type": "float",
@@ -1095,7 +1110,7 @@
         {
             "data_type": "string",
             "description": "The eleven character visit_id, PPPPPOOOVVV, uniquely indentifies the visit and consists of the program, observation and visit destinations. This visit_id is explicitly embedded in the file name and also included in the Science Image header and footer in the Recorded Science Data file",
-            "name": "visid_id"
+            "name": "visit_id"
         },
         {
             "data_type": "string",
@@ -1200,7 +1215,7 @@
         {
             "data_type": "string",
             "description": "User-specified MIRI direction of dither pattern offsets to use, included when a NIRISS dither is in parallel with MIRI Imaging and pattern type is 4-POINT-SETS. Possible values are: POSITIVE, NEGATIVE",
-            "name": "miri_ditchdirc"
+            "name": "miri_dithdirc"
         },
         {
             "data_type": "integer",
@@ -1404,6 +1419,26 @@
         },
         {
             "data_type": "integer",
+            "description": "NIRCam Pupil wheel position offset (actual minus commanded)",
+            "name": "nircam_pwposoff"
+        },
+        {
+            "data_type": "string",
+            "description": "NIRCam Pupil wheel position tolerance",
+            "name": "nircam_pwpostol"
+        },
+        {
+            "data_type": "integer",
+            "description": "NIRCam Filter wheel position offset (actual minus commanded)",
+            "name": "nircam_fwposoff"
+        },
+        {
+            "data_type": "string",
+            "description": "NICRam Filter wheel position tolerance",
+            "name": "nircam_fwpostol"
+        },
+        {
+            "data_type": "integer",
             "description": "NIRISS direct image dither number of points, included when a NIRCam Imaging dither is in parallel with NIRISS WFSS and pattern type is WFSS. Possible values are: 2, 3, 4, 6, 8, 9, 12, 16",
             "name": "niriss_nrimdtpt"
         },
@@ -1465,7 +1500,7 @@
         {
             "data_type": "float",
             "description": "Grating wheel tilt sensor value GWA_X_TILT_AVGED, corrected for sensor supply voltage offsets and averaged over multiple samples. In the instrument/wheel-centric reference frame this is the angle ALONG the X axis, while in the NIRSpec instrument model (used to define the WCS of the data) this is the angle AROUND the X axis, and hence is equivalent to the angle along the Y axis",
-            "name": "nirspec_gwa_xtilt"
+            "name": "nirspec_gwa_xtil"
         },
         {
             "data_type": "float",
@@ -1475,7 +1510,7 @@
         {
             "data_type": "float",
             "description": "Grating wheel tilt sensor value GWA_Y_TILT_AVGED, corrected for sensor supply voltage offsets and averaged over multiple samples. In the instrument/wheel-centric reference frame this is the angle ALONG the Y axis, while in the NIRSpec instrument model (used to define the WCS of the data) this is the angle AROUND the Y axis, and hence is equivalent to the angle along the X axis",
-            "name": "nirspec_gwa_ytilt"
+            "name": "nirspec_gwa_ytil"
         },
         {
             "data_type": "string",
@@ -1652,24 +1687,64 @@
             "name": "search_pos"
         },
         {
-            "data_type": "int",
-            "description": "The sequence of activities produced by each iteration of a Segment Plan (Observation Sequence) in a Pass.",
-            "name": "segment"
+            "data_type": "string",
+            "description": "Data set name",
+            "name": "fileSetName"
+        },
+        {
+            "data_type": "string",
+            "description": "Product levels, 1 is Uncalibrated detector ramps, 2 = Calibrated detector                rate images, and 3 = Re-pixellated data including, e.g., co-additions and mosaics",
+            "name": "productLevel"
+        },
+        {
+            "data_type": "string",
+            "description": "The combined filter, grating, pupil, channel, band, & coronmsk used                (e.g. F062, F087)",
+            "name": "optical_element"
+        },
+        {
+            "data_type": "float",
+            "description": "The difference in time (in units of seconds) between the start of the first                reset/read and end of the last read in the readout pattern.",
+            "name": "exposure_time"
+        },
+        {
+            "data_type": "datetime",
+            "description": "Observation start time",
+            "name": "visit_start_time"
+        },
+        {
+            "data_type": "integer",
+            "description": "ID number (integer) assigned to the proposal (e.g. 1012, 12045)",
+            "name": "program"
         },
         {
             "data_type": "int",
-            "description": "The collection of activities generated from each iteration of a Pass Plan. Multiple Passes may be generated from the same Pass Plan to allow repetition or execute at different orientations",
+            "description": "The collection of activities generated from each iteration of a Pass Plan.                Multiple Passes may be generated from the same Pass Plan to allow repetition or                execute at different orientations",
             "name": "pass"
         },
         {
             "data_type": "int",
-            "description": "ArchiveFileID",
-            "name": "ArchiveFileID"
+            "description": "The sequence of activities produced by each iteration of a Segment Plan                (Observation Sequence) in a Pass.",
+            "name": "segment"
         },
         {
             "data_type": "string",
-            "description": "Data set name",
-            "name": "fileSetName"
+            "description": "exposure type - type of data in the exposure",
+            "name": "exposure_type"
+        },
+        {
+            "data_type": "string",
+            "description": "Program Category",
+            "name": "program_category"
+        },
+        {
+            "data_type": "string",
+            "description": "Program Sub Category",
+            "name": "program_subcategory"
+        },
+        {
+            "data_type": "string",
+            "description": "Program Title",
+            "name": "program_title"
         },
         {
             "data_type": "string",
@@ -1678,8 +1753,13 @@
         },
         {
             "data_type": "string",
-            "description": "Product levels, 1 is Uncalibrated detector ramps, 2 =  Calibrated detector rate images, and 3 = Re-pixellated data including, e.g., co-additions and mosaics",
-            "name": "productLevel"
+            "description": "Origin",
+            "name": "origin"
+        },
+        {
+            "data_type": "string",
+            "description": "Version of calibration software",
+            "name": "calibration_software_version"
         },
         {
             "data_type": "ra",
@@ -1692,14 +1772,154 @@
             "name": "dec_ref"
         },
         {
-            "data_type": "string",
-            "description": "exposure type - type of data in the exposure",
-            "name": "exposure_type"
+            "data_type": "int",
+            "description": "ArchiveFileID",
+            "name": "ArchiveFileID"
+        },
+        {
+            "data_type": "float",
+            "description": "Pixel X coordinate at the center of the projection region over which the                world coordinate system (WCS) of this image is defined. If the projection region is                larger than the image contained within this file, then the value of x_ref may or may                not be contained within the boundaries of the data array in this file.",
+            "name": "x_ref"
+        },
+        {
+            "data_type": "float",
+            "description": "Pixel Y coordinate at the center of the projection region over which the                world coordinate system (WCS) of this image is defined. If the projection region is                larger than the image contained within this file, then the value of y_ref may or may                not be contained within the boundaries of the data array in this file.",
+            "name": "y_ref"
+        },
+        {
+            "data_type": "float",
+            "description": "Pixel scale in units of arcseconds per pixel at the center of the                projection region. If this product does not use the Roman sky tessellation, then this                keyword will be equal to meta.wcsinfo.pixel_scale.",
+            "name": "pixel_scale_ref"
+        },
+        {
+            "data_type": "float",
+            "description": "Pixel scale in units of arcseconds per pixel at the center of the image in                this file.",
+            "name": "pixel_scale"
         },
         {
             "data_type": "string",
-            "description": "Survey",
-            "name": "program_subcategory"
+            "description": "Type of projection used for the world coordinate system (WCS). A value of                \"TAN\" indicates a tangent plane projection.",
+            "name": "projection"
+        },
+        {
+            "data_type": "string",
+            "description": "Shape of the image (nx, ny) in units of pixels.",
+            "name": "image_shape"
+        },
+        {
+            "data_type": "ra",
+            "description": "Right ascension in units of degrees at the center of the image.",
+            "name": "ra"
+        },
+        {
+            "data_type": "dec",
+            "description": "Declination in units of degrees at the center of the image.",
+            "name": "dec"
+        },
+        {
+            "data_type": "float",
+            "description": "Angle in units of degrees between celestial North and the image y-axis at                the center of the image turning positive in the direction of increasing right                ascension.",
+            "name": "orientation"
+        },
+        {
+            "data_type": "float",
+            "description": "Angle in units of degrees between celestial North and the image y-axis at                the center of the projection region turning positive in the direction of increasing                right ascension. If this product does not use the Roman sky tessellation, then this                keyword will be equal to meta.wcsinfo.orientation.",
+            "name": "orientation_ref"
+        },
+        {
+            "data_type": "string",
+            "description": "Name of the skycell in the Roman sky tessellation to which this product                corresponds. If this product is not a skycell product, this field will be None.",
+            "name": "skycell_name"
+        },
+        {
+            "data_type": "string",
+            "description": "Spatial Footprint",
+            "name": "spatial"
+        },
+        {
+            "data_type": "string",
+            "description": "Telescope Name",
+            "name": "telescope"
+        },
+        {
+            "data_type": "string",
+            "description": "Rotation Matrix.",
+            "name": "rotation_matrix"
+        },
+        {
+            "data_type": "string",
+            "description": "Reference Frame.",
+            "name": "reference_frame"
+        },
+        {
+            "data_type": "string",
+            "description": "Science Category.",
+            "name": "science_category"
+        },
+        {
+            "data_type": "string",
+            "description": "Name of Calibration Software",
+            "name": "calibration_software_name"
+        },
+        {
+            "data_type": "float",
+            "description": "ID of released data",
+            "name": "data_release_id"
+        },
+        {
+            "data_type": "integer",
+            "description": "Product Version",
+            "name": "prd_version"
+        },
+        {
+            "data_type": "string",
+            "description": "Product Type",
+            "name": "product_type"
+        },
+        {
+            "data_type": "integer",
+            "description": "Execution Plan",
+            "name": "execution_plan"
+        },
+        {
+            "data_type": "string",
+            "description": "Exposure Grouping",
+            "name": "exposure_grouping"
+        },
+        {
+            "data_type": "float",
+            "description": "Maximum Exposure Time",
+            "name": "max_exposure_time"
+        },
+        {
+            "data_type": "string",
+            "description": "Model Type",
+            "name": "model_type"
+        },
+        {
+            "data_type": "integer",
+            "description": "Observation",
+            "name": "observation"
+        },
+        {
+            "data_type": "datetime",
+            "description": "File Date",
+            "name": "filedate"
+        },
+        {
+            "data_type": "datetime",
+            "description": "Time First",
+            "name": "time_first"
+        },
+        {
+            "data_type": "datetime",
+            "description": "Time Last",
+            "name": "time_last"
+        },
+        {
+            "data_type": "datetime",
+            "description": "Mean Time",
+            "name": "time_mean"
         },
         {
             "data_type": "substring",
@@ -1712,29 +1932,69 @@
             "name": "instrument_name"
         },
         {
-            "data_type": "string",
-            "description": "The combined filter, grating, pupil, channel, band, & coronmsk used (e.g. F062, F087)",
-            "name": "optical_element"
-        },
-        {
-            "data_type": "float",
-            "description": "Exposure time in seconds",
-            "name": "exposure_time"
-        },
-        {
-            "data_type": "integer",
-            "description": "ID number (integer) assigned to the proposal    (e.g. 1012, 12045)",
-            "name": "program"
-        },
-        {
             "data_type": "integer",
             "description": "Visit number within a program",
             "name": "visit"
         },
         {
             "data_type": "datetime",
-            "description": "Observation start time",
-            "name": "visit_start_time"
+            "description": "The UTC time at the beginning of the exposure. The time is serialized on                disk as an International Organization for Standardization (ISO) 8601-compliant ISOT                string, but if opened in Python with the asdf-astropy package installed, it may be                read as an astropy.time.Time object with all of the associated methods and transforms                available. See the documentation for astropy.time.Time objects for more information.",
+            "name": "exposure_start_time"
+        },
+        {
+            "data_type": "datetime",
+            "description": "The UTC time at the end of the exposure. The time is serialized on disk as                an International Organization for Standardization (ISO) 8601-compliant ISOT string,                but if opened in Python with the asdf-astropy package installed, it may be read as an                astropy.time.Time object with all of the associated methods and transforms available.                See the documentation for astropy.time.Time objects for more information.",
+            "name": "exposure_end_time"
+        },
+        {
+            "data_type": "string",
+            "description": "Indicator of data quality problems with the engineering data used to                populated select metadata fields. A value of \"OK\" indicates no suspected problems,                while a value of \"SUSPECT\" indicates one or more metadata values populated from the                engineering database may be missing information during the exposure or are otherwise                of lower quality.",
+            "name": "engineering_quality"
+        },
+        {
+            "data_type": "integer",
+            "description": "The number of resultant frames in this exposure that were transmitted to                the ground.",
+            "name": "exposure_nresultants"
+        },
+        {
+            "data_type": "string",
+            "description": "String error codes indicating that a problem occurred with the exposure. A                value of None indicates there were no problems with the exposure. See the Roman                Documentation System (RDox) for more information on the meaning of the error codes.",
+            "name": "exposure_data_problem"
+        },
+        {
+            "data_type": "float",
+            "description": "The readout time in seconds of the Wide Field Instrument (WFI) detectors.                This represents the time between the start and end of the readout.",
+            "name": "exposure_frame_time"
+        },
+        {
+            "data_type": "integer",
+            "description": "The difference in time (in units of seconds) between the midpoints of the                first and last science resultants. If either resultant contains only a single read,                then the time at the end of the read is used rather than the midpoint time.",
+            "name": "effective_exposure_time"
+        },
+        {
+            "data_type": "string",
+            "description": "The name of the multi-accumulation (MA) table used for the exposure. The MA                table is also referred to as the readout pattern.",
+            "name": "ma_table_name"
+        },
+        {
+            "data_type": "integer",
+            "description": "A unique identification number for the multi-accumulation (MA) table used                for this exposure. The number comes from the Science Operations Center (SOC) Project                Reference Database (PRD).",
+            "name": "ma_table_number"
+        },
+        {
+            "data_type": "string",
+            "description": "A unique identifier for the multi-accumulation (MA) table used for this                exposure. The identifier comes from the Science Operations Center (SOC) Project                Reference Database (PRD).",
+            "name": "ma_table_id"
+        },
+        {
+            "data_type": "string",
+            "description": "The enumeration of detector reads to resultants making up the Level 1 ramp                data cube. The read pattern is nested such that each grouping of read numbers                represents a resultant. For example, a readout pattern of [[1], [2, 3], [4]] consists                of four reads that were downlinked as three resultants with both the first and last                resultant each containing a single read.",
+            "name": "read_pattern"
+        },
+        {
+            "data_type": "boolean",
+            "description": "A flag indicating whether the MA table was truncated.",
+            "name": "exposure_truncated"
         },
         {
             "data_type": "string",
@@ -1742,14 +2002,489 @@
             "name": "s_region"
         },
         {
-            "data_type": "float",
-            "description": "Angular Separation",
-            "name": "ang_sep"
-        },
-        {
             "data_type": "string",
             "description": "Data access status (PUBLIC or RESTRICTED=exclusive data)",
             "name": "access"
+        },
+        {
+            "data_type": "string",
+            "description": "A boolean flag to indicate if the Relative Calibration System (RCS) is on                (True) or off (False) during the exposure.",
+            "name": "active"
+        },
+        {
+            "data_type": "string",
+            "description": "Name of the aperture used to specify the transformations between detector                pixel, science pixel, and spacecraft V coordinate frames. This information comes from                the Science Instrument Aperture File (SIAF) in the Science Operations Center (SOC)                Project Reference Database (PRD).",
+            "name": "aperture_name"
+        },
+        {
+            "data_type": "string",
+            "description": "The bank of light emitting diodes (LEDs) selected in the program                specification in the Astronomer's Proposal Tool (APT). Values may be either '1' or                '2' if the RCS is on, and 'N/A' if the RCS is off.",
+            "name": "bank"
+        },
+        {
+            "data_type": "float",
+            "description": "The flux density (in units of megaJanskys per steradian; MJy/sr) that                produces an instrumental count rate of 1 data number (DN) per second. A unit change                to microJanskys per square arcsecond (uJy/arcsec^2) can be made by multiplying this                value by the ratio (1 x 10^12 MJy/uJy) / (4.254517 x 10^10 arcsec^2/sr) =                23.50443054.",
+            "name": "conversion_megajanskys"
+        },
+        {
+            "data_type": "float",
+            "description": "The uncertainty in the flux density (in units of megaJanskys per steradian;                MJy/sr) that produces an instrumental count rate of 1 data number (DN) per second. A                unit change to microJanskys per square arcsecond (uJy/arcsec^2) can be made by                multiplying this value by the ratio (1 x 10^12 MJy/uJy) / (4.254517 x 10^10                arcsec^2/sr) = 23.50443.",
+            "name": "conversion_megajanskys_uncertainty"
+        },
+        {
+            "data_type": "integer",
+            "description": "The integrated number of counts of the light emitting diode (LED) selected                in the program specification in the Astronomer's Proposal Tool (APT). Values are                between 0 and 65,535 in units of DN.",
+            "name": "counts"
+        },
+        {
+            "data_type": "string",
+            "description": "Name of the Calibration Reference Data System (CRDS) context (.pmap) file                used to match calibration reference files to science observations.",
+            "name": "crds_context"
+        },
+        {
+            "data_type": "string",
+            "description": "Version of the Calibration Reference Data System (CRDS) software package                used to match calibration reference files to science observations.",
+            "name": "crds_version"
+        },
+        {
+            "data_type": "float",
+            "description": "Reference position declination corrected for velocity aberration in units                of degrees.",
+            "name": "dec_reference"
+        },
+        {
+            "data_type": "float",
+            "description": "The declination coordinate of the V1 axis in units of degrees. This may be                considered the declination coordinate of the telescope boresight. The telescope V                coordinate system is defined with its origin at the vertex of the primary mirror. The                +V1 axis is orthogonal to the primary mirror, parallel to the telescope boresight,                and increasing positively through the telescope aperture. See Roman-STScI-000143                'Description of the Roman SIAF and Coordinate Frames' for more information.",
+            "name": "dec_v1"
+        },
+        {
+            "data_type": "string",
+            "description": "The combination of the primary and subpixel dither patterns (if selected)                in units of arcseconds. If a subpixel dither pattern is selected, then all of the                subpixel dither offsets are performed at each of the points in the primary dither                pattern. Thus, the total number of dither offsets executed is the product of the                number of points in the primary and subpixel dither patterns. The array contains (X,                Y) pairs of offsets in the subpixel dither pattern where the X and Y coordinates are                defined in the ideal system. The ideal coordinate system is a                geomtric-distortion-corrected reference frame projected onto a tangent plane. For                more information, see the Science Instrument Aperture File (SIAF) and associated                documentation. The exposure identifier in meta.observation.exposure can be used to                index this array to obtain the relative pointing offset from the initial target                position for this exposure. Note that the exposure identifier is 1-indexed.",
+            "name": "dither_executed_pattern"
+        },
+        {
+            "data_type": "string",
+            "description": "Name of the primary dither pattern used for the visit.",
+            "name": "dither_primary_name"
+        },
+        {
+            "data_type": "string",
+            "description": "Name of the subpixel dither pattern used for the visit.",
+            "name": "dither_subpixel_name"
+        },
+        {
+            "data_type": "string",
+            "description": "The active redundant electronics used to control the Relative Calibration                System (RCS). Values may be 'A' or 'B' if the RCS is on, and 'N/A' if the RCS is off.",
+            "name": "electronics"
+        },
+        {
+            "data_type": "string",
+            "description": "Reference frame of the ephemeris information.",
+            "name": "ephemeris_reference_frame"
+        },
+        {
+            "data_type": "float",
+            "description": "UTC time of the position and velocity vectors in the ephemeris. The time is                provided in modified Julian date (MJD).",
+            "name": "ephemeris_time"
+        },
+        {
+            "data_type": "string",
+            "description": "Type of ephemeris (either DEFINITIVE or PREDICTED).",
+            "name": "ephemeris_type"
+        },
+        {
+            "data_type": "string",
+            "description": "Epoch of the celestial coordinates of the guide star from the Guide Star                Catalog (GSC).",
+            "name": "epoch"
+        },
+        {
+            "data_type": "float",
+            "description": "The fraction of pixels in the output image that are considered good.",
+            "name": "good_pixel_fraction"
+        },
+        {
+            "data_type": "string",
+            "description": "guide_mode",
+            "name": "guide_mode"
+        },
+        {
+            "data_type": "string",
+            "description": "Identification of the guide star from the Guide Star Catalog (GSC). This is                based on planned information from the Roman Planning and Scheduling Subsystem.",
+            "name": "guide_star_id"
+        },
+        {
+            "data_type": "string",
+            "description": "guide_window_id",
+            "name": "guide_window_id"
+        },
+        {
+            "data_type": "float",
+            "description": "Median image value in units of megaJanskys per steradian (MJy/sr).",
+            "name": "image_median"
+        },
+        {
+            "data_type": "float",
+            "description": "Mean absolute deviation of the image values in units of data numbers per                second (DN/s).",
+            "name": "image_rms"
+        },
+        {
+            "data_type": "string",
+            "description": "The light emitting diode (LED) passband selected in the program                specification in the Astronomer's Proposal Tool (APT). Values are integer strings                between '1' and '6' inclusive, when the RCS is on, and 'N/A' when the RCS is off.",
+            "name": "led"
+        },
+        {
+            "data_type": "integer",
+            "description": "An exposure is a single multi-accumulation (MA) table sequence of the                detector array at a single dither point in the dither pattern. The allowed range of                exposure numbers is 0001 to 9999 inclusive.",
+            "name": "observation_exposure"
+        },
+        {
+            "data_type": "string",
+            "description": "The format of the programmatic observation identifier is                'PPPPPCCAAASSSOOOVVVggsaaeee' where 'PPPPP' is the program number, 'CC' is the                execution plan number, 'AAA' is the pass number, 'SSS' is the segment number, 'OOO'                is the observation number, 'VVV' is the visit number, 'gg' is the visit file group,                's' is the visit file sequence, 'aa' is the visit file activity, and 'eeee' is the                exposure number. The observation identifier is the complete concatenation of the                visit_id + visit_file_statement (visit_file_group + visit_file_sequence +                visit_file_activity) + exposure.",
+            "name": "observation_id"
+        },
+        {
+            "data_type": "float",
+            "description": "Position angle in degrees of the aperture ideal Y axis relative to the V3                axis of the spacecraft. This information comes from the Science Instrument Aperture                File (SIAF) in the Science Operations Center (SOC) Project Reference Database (PRD).",
+            "name": "pa_aperture"
+        },
+        {
+            "data_type": "float",
+            "description": "The position angle of the V3 axis (in units of degrees) is defined as the                projection of the V3 axis on the sky measured from North to East. The telescope V                coordinate system is defined with its origin at the vertex of the primary mirror. The                +V3 axis is defined to be orthogonal to the sunshield. See Roman-STScI-000143                'Description of the Roman SIAF and Coordinate Frames' for more information.",
+            "name": "pa_v3"
+        },
+        {
+            "data_type": "float",
+            "description": "The average pixel area in units of steradians. This may be converted to                units of square arcseconds by multiplying the value by 4.254517 x 10^10 square                arcseconds per steradian.",
+            "name": "pixel_area"
+        },
+        {
+            "data_type": "string",
+            "description": "The source type of the pointing information in the metadata may be set to                either 'PLANNED' or 'CALCULATED'. If the value is 'PLANNED', then pointing mnemonics                were not found in the engineering database, and the pointing data were taken from the                observation planning information. If the value is 'CALCULATED', then the pointing                data were determined using the information in the engineering database.",
+            "name": "pointing_engineering_source"
+        },
+        {
+            "data_type": "float",
+            "description": "Reference position right ascension corrected for velocity aberration in                units of degrees.",
+            "name": "ra_reference"
+        },
+        {
+            "data_type": "float",
+            "description": "The right ascension coordinate of the V1 axis in units of degrees. This may                be considered the right ascension coordinate of the telescope boresight. The                telescope V coordinate system is defined with its origin at the vertex of the primary                mirror. The V1 axis is orthogonal to the primary mirror, parallel to the telescope                boresight, and increasing positively through the telescope aperture. See                Roman-STScI-000143 'Description of the Roman SIAF and Coordinate Frames' for more                information.",
+            "name": "ra_v1"
+        },
+        {
+            "data_type": "float",
+            "description": "Position angle of the telescope V3 axis at the reference pixel position                measured from North to East. The telescope V coordinate system is defined with its                origin at the vertex of the primary mirror. The +V3 axis is orthogonal to the                sunshield. See Roman-STScI-000143 'Description of the Roman SIAF and Coordinate                Frames' for more information.",
+            "name": "roll_ref"
+        },
+        {
+            "data_type": "float",
+            "description": "Scale factor used for the correction of the velocity aberration.",
+            "name": "scale_factor"
+        },
+        {
+            "data_type": "string",
+            "description": "The version number of the Science Operations Center (SOC) Science Data                Formatting (SDF) software used in generating this file.",
+            "name": "sdf_software_version"
+        },
+        {
+            "data_type": "float",
+            "description": "X barycentric coordinate of the Roman observatory at the MJD described by                meta.ephemeris.time.",
+            "name": "spatial_x"
+        },
+        {
+            "data_type": "float",
+            "description": "Y barycentric coordinate of the Roman observatory at the MJD described by                meta.ephemeris.time.",
+            "name": "spatial_y"
+        },
+        {
+            "data_type": "float",
+            "description": "Z barycentric coordinate of the Roman observatory at the MJD described by                meta.ephemeris.time.",
+            "name": "spatial_z"
+        },
+        {
+            "data_type": "string",
+            "description": "Name of the aperture used to align the instrument to a position on the sky.",
+            "name": "target_aperture"
+        },
+        {
+            "data_type": "float",
+            "description": "Declination in units of degrees at the location of the target aperture.",
+            "name": "target_dec"
+        },
+        {
+            "data_type": "float",
+            "description": "Right ascension in units of degrees at the location of the target aperture.",
+            "name": "target_ra"
+        },
+        {
+            "data_type": "float",
+            "description": "Coordinate of the reference pixel position along the telescope V2 axis in                units of arcseconds. This information comes from the Science Instrument Aperture File                (SIAF) in the Science Operations Center (SOC) Project Reference Database (PRD). The                telescope V coordinate system is defined with its origin at the vertex of the primary                mirror. The +V1 axis is defined as parallel to the telescope boresight, the +V3 axis                is orthogonal to the sunshield, and the +V2 axis completes the right-hand system. See                Roman-STScI-000143 'Description of the Roman SIAF and Coordinate Frames' for more                information.",
+            "name": "v2_ref"
+        },
+        {
+            "data_type": "float",
+            "description": "Coordinate of the reference pixel position along the telescope V3 axis in                units of arcseconds. This information comes from the Science Instrument Aperture File                (SIAF) in the Science Operations Center (SOC) Project Reference Database (PRD). The                telescope V coordinate system is defined with its origin at the vertex of the primary                mirror. The +V3 axis is orthogonal to the sunshield. See Roman-STScI-000143                'Description of the Roman SIAF and Coordinate Frames' for more information.",
+            "name": "v3_ref"
+        },
+        {
+            "data_type": "float",
+            "description": "Angle between the telescope V3 axis and the ideal Y axis in units of                degrees. This information comes from the Science Instrument Aperture File (SIAF) in                the Science Operations Center (SOC) Project Reference Database (PRD). The telescope V                coordinate system is defined with its origin at the vertex of the primary mirror. The                +V3 axis is orthogonal to the sunshield. The ideal coordinate system is a                geomtric-distortion-corrected reference frame projected onto a tangent plane. See                Roman-STScI-000143 'Description of the Roman SIAF and Coordinate Frames' for more                information.",
+            "name": "v3yangle"
+        },
+        {
+            "data_type": "float",
+            "description": "X component of the Roman velocity in a barycentric system in units of km/s                at the MJD described by meta.ephemeris.time.",
+            "name": "velocity_x"
+        },
+        {
+            "data_type": "float",
+            "description": "Y component of the Roman velocity in a barycentric system in units of km/s                at the MJD described by meta.ephemeris.time.",
+            "name": "velocity_y"
+        },
+        {
+            "data_type": "float",
+            "description": "Z component of the Roman velocity in a barycentric system in units of km/s                at the MJD described by meta.ephemeris.time.",
+            "name": "velocity_z"
+        },
+        {
+            "data_type": "string",
+            "description": "The visit file activity number identifies the activity within the visit                file sequence. The allowed range of visit file activity numbers is 01 to 99                inclusive.",
+            "name": "visit_file_activity"
+        },
+        {
+            "data_type": "integer",
+            "description": "The visit file group identifies the sequence group within the visit file.                The allowed range of visit file group numbers is 01 to 99 inclusive.",
+            "name": "visit_file_group"
+        },
+        {
+            "data_type": "integer",
+            "description": "The visit file sequence identifies the sequence within the visit file                group. A value of 1 indicates a prime instrument exposure, and a value greater than 1                indicates a parallel instrument exposure. The allowed range of visit file sequence                numbers of 1 to 5 inclusive.",
+            "name": "visit_file_sequence"
+        },
+        {
+            "data_type": "string",
+            "description": "A unique identifier for a visit. The format is 'PPPPPCCAAASSSOOOVVV' where                'PPPPP' is the program number, 'CC' is the execution plan number, 'AAA' is the pass                number, 'SSS' is the segment number, 'OOO' is the observation number, and 'VVV' is                the visit number.",
+            "name": "visit_id"
+        },
+        {
+            "data_type": "string",
+            "description": "A boolean indicator which, if true, indicates that the target for the visit                is an internal calibration target.",
+            "name": "visit_internal_target"
+        },
+        {
+            "data_type": "integer",
+            "description": "The total number of exposures planned within the visit.",
+            "name": "visit_nexposures"
+        },
+        {
+            "data_type": "string",
+            "description": "The type of visit from observation planning.",
+            "name": "visit_type"
+        },
+        {
+            "data_type": "integer",
+            "description": "Relative sense of rotation between the ideal and telescope coordinate                systems. The value may be either 1 or -1. This information comes from the Science                Instrument Aperture File (SIAF) in the Science Operations Center (SOC) Project                Reference Database (PRD). See documents STScI-JWST-001550 and STScI-Roman-000143 for                more information.",
+            "name": "vparity"
+        },
+        {
+            "data_type": "string",
+            "description": "A boolean flag that, when true, indicates the WFI was operated in parallel                with the Coronagraph as the prime observing instrument. If false, the WFI was                operated as the prime observing instrument.",
+            "name": "wfi_parallel"
+        },
+        {
+            "data_type": "integer",
+            "description": "Minimum X position in pixels in the science coordinate frame of all                tracking guide windows in this exposure.",
+            "name": "window_xstart"
+        },
+        {
+            "data_type": "integer",
+            "description": "Maximum X position in pixels in the science coordinate frame of all                tracking guide windows in this exposure.",
+            "name": "window_xstop"
+        },
+        {
+            "data_type": "integer",
+            "description": "Minimum Y position in pixels in the science coordinate frame of all                tracking guide windows in this exposure.",
+            "name": "window_ystart"
+        },
+        {
+            "data_type": "integer",
+            "description": "Maximum Y position in pixels in the science coordinate frame of all                tracking guide windows in this exposure.",
+            "name": "window_ystop"
+        },
+        {
+            "data_type": "float",
+            "description": "A model estimate of the Zodiacal light contribution to the sky background                in units of MegaJanskys per steradian (MJy/sr).",
+            "name": "zodiacal_light"
+        },
+        {
+            "data_type": "integer",
+            "description": "Unique ID number for this catalog",
+            "name": "catalog_id"
+        },
+        {
+            "data_type": "integer",
+            "description": "CDP Context for calibration files",
+            "name": "cdp_ctx"
+        },
+        {
+            "data_type": "float",
+            "description": "Dither position id. Example value '1'",
+            "name": "dither"
+        },
+        {
+            "data_type": "integer",
+            "description": "File number for this catalog file (e.g., 1)",
+            "name": "file_number"
+        },
+        {
+            "data_type": "string",
+            "description": "ID of the G2DP run that created the G2DP file(s). Example value '42'",
+            "name": "g2dp_run_id"
+        },
+        {
+            "data_type": "integer",
+            "description": "The number of sources in the Spectra Location Table file. Example value                '500'",
+            "name": "num_src"
+        },
+        {
+            "data_type": "string",
+            "description": "The name of the optical model file used for the SLT calculation. Example                value 'roman_gdps_grism_optmodel_ctx00002.yaml'",
+            "name": "optical_model"
+        },
+        {
+            "data_type": "string",
+            "description": "The filter used for the G2DP magnitude cut off. Example value 'F158'",
+            "name": "phot_filter_cut_off"
+        },
+        {
+            "data_type": "string",
+            "description": "Identifies if this observation program is finished. Example value 'False'",
+            "name": "program_complete"
+        },
+        {
+            "data_type": "string",
+            "description": "Example value 'W m**(-2) nm**(-1)'",
+            "name": "unit_flux"
+        },
+        {
+            "data_type": "string",
+            "description": "Example value 'nm'",
+            "name": "unit_wl"
+        },
+        {
+            "data_type": "string",
+            "description": "Version of the G2DP software (roman-gdps-g2dp repo). Example value 'v3.3.0'",
+            "name": "version_g2dp_software"
+        },
+        {
+            "data_type": "float",
+            "description": "Observation end time in MJD",
+            "name": "visit_end_time_mjd"
+        },
+        {
+            "data_type": "float",
+            "description": "Exposure time in seconds",
+            "name": "visit_exptime"
+        },
+        {
+            "data_type": "float",
+            "description": "Observation start time in MJD",
+            "name": "visit_start_time_mjd"
+        },
+        {
+            "data_type": "float",
+            "description": "Declination, position of the center of the field. Example value '66.0'",
+            "name": "wcs_field_center_dec"
+        },
+        {
+            "data_type": "float",
+            "description": "Right Ascension, position of the center of the field. Example value '270.0'",
+            "name": "wcs_field_center_ra"
+        },
+        {
+            "data_type": "string",
+            "description": "Observed wavelength range that the contamination is estimated from                overlapping spectra. Example value '[14000.0, 16000.0]'",
+            "name": "wl_contamination_range"
+        },
+        {
+            "data_type": "float",
+            "description": "Reference wavelength that the optical model adopts for its calculation Used                to define a single pixel location of each spectrum coadded. Example value '1.55'",
+            "name": "wl_reference"
+        },
+        {
+            "data_type": "string",
+            "description": "The wavelength range that the global SNR measurement. Example value '[0.0]'",
+            "name": "wl_snr_global_range"
+        },
+        {
+            "data_type": "string",
+            "description": "The WFI aperture name",
+            "name": "aperture"
+        },
+        {
+            "data_type": "string",
+            "description": "The submitted proposal category of the program. The categories include                calibration (CAL), core community survey (CCS), coronagraph technology demonstration                (CGI), observatory commissioning (COM), engineering (ENG), general astrophysics                survey (GAS), general investigator (GI), and observing conducted at the direction of                the National Aeronautics and Space Administration (NASA).",
+            "name": "category"
+        },
+        {
+            "data_type": "float",
+            "description": "Last timestamp in the light curve (MJD)",
+            "name": "exposure_end_time_mjd"
+        },
+        {
+            "data_type": "float",
+            "description": "First timestamp in the light curve (MJD)",
+            "name": "exposure_start_time_mjd"
+        },
+        {
+            "data_type": "string",
+            "description": "Flip Flag",
+            "name": "flip_flag"
+        },
+        {
+            "data_type": "string",
+            "description": "Galactic Center Flag",
+            "name": "galactic_center_flag"
+        },
+        {
+            "data_type": "float",
+            "description": "Mean of component image exposure times",
+            "name": "mean_exposure_time"
+        },
+        {
+            "data_type": "string",
+            "description": "Msos Detection Efficiency Version",
+            "name": "msos_detection_efficiency_version"
+        },
+        {
+            "data_type": "string",
+            "description": "Msos Events Version",
+            "name": "msos_events_version"
+        },
+        {
+            "data_type": "string",
+            "description": "Msos Photometry Version",
+            "name": "msos_photometry_version"
+        },
+        {
+            "data_type": "string",
+            "description": "Season",
+            "name": "season"
+        },
+        {
+            "data_type": "integer",
+            "description": "Delivery sequence",
+            "name": "sequence"
+        },
+        {
+            "data_type": "float",
+            "description": "The MJD mean start time of the exposures used to create the product.",
+            "name": "time_mean_mjd"
+        },
+        {
+            "data_type": "float",
+            "description": "Angular Separation",
+            "name": "ang_sep"
         },
         {
             "data_type": "string",
