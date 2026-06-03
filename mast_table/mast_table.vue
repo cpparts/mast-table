@@ -1,5 +1,5 @@
 <template>
-  <v-row>
+  <v-row class="mast-table">
   <div v-if="show_if_empty || items.length">
     <v-col style="max-width: 400px;">
       <div class="row-select">
