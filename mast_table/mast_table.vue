@@ -45,6 +45,10 @@
       </v-col>
     </div>
   
+  <v-btn icon @click="filter_tray_open = !filter_tray_open">
+    <v-icon>mdi-filter</v-icon>
+  </v-btn>
+
   <jupyter-widget :widget="popout_button"></jupyter-widget>
 
   <v-menu v-model="menu_open" :close-on-content-click="false" anchor="start end">
@@ -126,7 +130,7 @@
 
 <script>
 module.exports = {
-  props: ['column_descriptions', 'show_tooltips', 'popout_button'],
+  props: ['column_descriptions', 'show_tooltips', 'popout_button', 'filter_tray_open'],
   computed: {
     headers_visible_sorted() {
       return this.headers_avail.filter(item => this.headers_visible.indexOf(item) !== -1);
