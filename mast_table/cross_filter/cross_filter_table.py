@@ -388,6 +388,8 @@ def SelectableTable(
     table,
     items_per_page: int = 10,
     on_selected_indices: Optional[Callable[[List[int]], None]] = None,
+    drawer_open: bool = True,
+    set_drawer_open=None,
     **kwargs
 ):
     """An ipyvuetify DataTable with checkbox selection.
@@ -405,13 +407,22 @@ def SelectableTable(
             indices = [item[col_unique_row_index] for item in msg['new']]
             on_selected_indices(indices)
 
-    mast_table = solara.use_memo(
-        lambda: MastTable(
+    def func():
+        def on_change(change):
+            set_drawer_open(change["new"])
+
+        mt = MastTable(
             table,
             item_key=col_unique_row_index,
             items_per_page=items_per_page,
-        ),
-        []
+            filter_tray_open=drawer_open
+        )
+        mt.observe(on_change, 'filter_tray_open')
+        return mt
+
+    mast_table = solara.use_memo(
+        func,
+        [],
     )
 
     mast_table.selected_rows = [
@@ -509,21 +520,6 @@ def CrossFilterMastTable(observations):
         )
 
     solara.lab.theme.themes.light.primary = "#00627e"
-
-    with v.AppBar(
-        color="#b4dbe9",
-        dark=False,
-    ):
-        with v.ToolbarTitle():
-            solara.Button(
-                "Conditions",
-                icon_name="mdi-filter",
-                on_click=lambda: set_drawer_open(not drawer_open),
-                style={
-                    "background-color": "transparent",
-                    "color": "black",
-                },
-            )
 
     with solara.Column(
         style={
@@ -692,5 +688,8 @@ def CrossFilterMastTable(observations):
                     if combined_mask is not None
                     else observations
                 )
-
-                SelectableTable(filtered_table)
+                SelectableTable(
+                    filtered_table,
+                    drawer_open=drawer_open,
+                    set_drawer_open=set_drawer_open
+                )

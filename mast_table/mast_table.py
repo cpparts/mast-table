@@ -71,6 +71,7 @@ class MastTable(VuetifyTemplate):
     popout_button = Any().tag(sync=True, **widget_serialization)
     enable_load_in_app = Bool(False).tag(sync=True)
     mission = Unicode().tag(sync=True)
+    filter_tray_open = Bool(True).tag(sync=True)
 
     # item_key is a column of the table with unique values
     # for each row, enabling selection of the row by lookup
