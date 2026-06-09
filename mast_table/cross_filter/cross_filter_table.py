@@ -126,7 +126,7 @@ def CrossFilterSelect(
             value_counts_filtered,
             join_type="left",
             keys="value"
-            )
+        )
     else:
         value_counts['count'] = 0
         value_counts['exists'] = False
@@ -152,14 +152,15 @@ def CrossFilterSelect(
     solara.use_memo(reset, dependencies=[column])
 
     def update_filter():
-        if len(filter_values) == 0:
+        if (
+            len(filter_values) == 0 or
+            set(filter_values) >= set(np.unique(table[column].astype(str)))
+        ):
             set_mask(filter_id, None)
-        else:
-            filter = table_filter_values(
-                table, column, filter_values,
-                invert=invert
-            )
-            set_mask(filter_id, filter)
+            return
+
+        mask = table_filter_values(table, column, filter_values, invert=invert)
+        set_mask(filter_id, mask)
 
     solara.use_memo(update_filter, dependencies=[filter_values, invert])
 
@@ -290,9 +291,8 @@ def CrossFilterSlider(
     solara.use_memo(reset, dependencies=[column])
 
     def update_filter():
-        if filter_value is None:
-            set_mask(filter_id, None)
-        else:
+        filter = None
+        if filter_value:
             operator_map = {
                 "==": operator.eq,
                 ">=": operator.ge,
@@ -304,7 +304,7 @@ def CrossFilterSlider(
             filter = operator_map[mode](table[column], filter_value)
             if invert:
                 filter = ~filter
-            set_mask(filter_id, filter)
+        set_mask(filter_id, filter)
 
     solara.use_memo(update_filter, dependencies=[filter_value, invert, mode])
 
@@ -353,30 +353,21 @@ def CrossFilterSlider(
                                                 set_mode=set_mode,
                                             )
                 solara.Markdown(label)
-
+            slider_args = {
+                "label": "",
+                "value": filter_value,
+                "min": vmin,
+                "max": vmax,
+                "step": step_size(vmin, vmax),
+                "on_value": set_filter_value,
+                "thumb_label": True,
+                "tick_labels": False,
+            }
             # creating slider
             if issubclass(py_types[column], (int, np.integer)):
-                solara.SliderInt(
-                    label="",
-                    value=filter_value,
-                    min=vmin,
-                    max=vmax,
-                    step=step_size(vmin, vmax),
-                    on_value=set_filter_value,
-                    thumb_label=True,
-                    tick_labels=False,
-                )
+                solara.SliderInt(*slider_args)
             elif issubclass(py_types[column], (float, np.floating)):
-                solara.SliderFloat(
-                    label="",
-                    value=filter_value,
-                    min=vmin,
-                    max=vmax,
-                    step=step_size(vmin, vmax),
-                    on_value=set_filter_value,
-                    thumb_label=True,
-                    tick_labels=False,
-                )
+                solara.SliderFloat(*slider_args)
             else:
                 solara.Warning(f"{py_types[column]} not supported for Slider")
 
