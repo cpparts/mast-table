@@ -61,12 +61,69 @@ def FilterModeButtons(
 
 
 @solara.component
+def SettingsMenu(
+    btn,
+    invert,
+    set_invert,
+    mode=None,
+    set_mode=None,
+    multiple=None,
+    set_multiple=None
+):
+    v_slots = [{"name": "activator", "variable": "x", "children": btn}]
+    with v.Menu(v_slots=v_slots, close_on_content_click=False):
+        with v.Sheet():
+            with v.Container(py_0=True, px_3=True, ma_0=True):
+                with v.Row():
+                    with v.Col():
+                        v.Switch(
+                            v_model=invert,
+                            on_v_model=set_invert,
+                            label="Invert filter"
+                        )
+
+                        if mode:
+                            FilterModeButtons(
+                                mode=mode,
+                                set_mode=set_mode,
+                            )
+
+                        if multiple is not None:
+                            v.Switch(
+                                v_model=multiple,
+                                on_v_model=set_multiple,
+                                label="Select multiple"
+                            )
+
+
+@solara.component
+def RemoveConditionButton(on_remove, filter_id):
+    solara.Button(
+        icon_name="mdi-close",
+        on_click=lambda: on_remove(filter_id),
+        style={"background-color": "#00627e", "color": "white"},
+        classes=["close-button"],
+    )
+    solara.Style(
+        """
+        .close-button {
+            min-width: 10px !important;
+            width: 30px !important;
+            height: 30px !important;
+            padding: 0 !important;
+        }
+        """
+    )
+
+
+@solara.component
 def CrossFilterSelect(
     table: Table,
     column: str,
     filter_id: str,
     set_mask: Callable,
     initial_values=None,
+    on_remove=None,
     max_unique: int = 100,
     multiple: bool = False,
     invert: bool = False,
@@ -82,6 +139,7 @@ def CrossFilterSelect(
     - `filter_id`: The unique filter instance ID.
     - `set_mask`: Callback for updating filter's mask.
     - `initial_values`: The initial values to set as selected.
+    - `on_remove`: Callback to remove this filter from parent filter list.
     - `max_unique`: The maximum number of unique values to show in the dropdown.
     - `multiple`: Whether to allow multiple values to be selected.
     - `invert`: Whether to invert the selection.
@@ -94,7 +152,7 @@ def CrossFilterSelect(
     elif isinstance(initial_values, str):
         initial_values = [initial_values]
 
-    filter_values, set_filter_values = solara.use_state(initial_values or [])
+    filter_values, set_filter_values = solara.use_state(initial_values)
     solara.use_effect(
         lambda: set_filter_values(initial_values or []),
         [initial_values],
@@ -154,7 +212,7 @@ def CrossFilterSelect(
     def update_filter():
         if (
             len(filter_values) == 0 or
-            set(filter_values) >= set(np.unique(table[column].astype(str)))
+            (not invert and set(filter_values) >= set(np.unique(table[column].astype(str))))
         ):
             set_mask(filter_id, None)
             return
@@ -179,10 +237,9 @@ def CrossFilterSelect(
         else ({"value": filter_values[0]} if filter_values else None)
     )
 
-    # TODO: reacton bug, we cannot add this under any component context manager
-    # this gives an error, probably because the button is added twice
     with v.Btn(v_on="x.on", icon=True) as btn:
         v.Icon(children=["mdi-settings"])
+
     with solara.VBox(classes=classes) as main:
         with solara.HBox(align_items="baseline"):
             with solara.Row(style={
@@ -192,32 +249,26 @@ def CrossFilterSelect(
             }):
                 solara.Markdown(f"**{column}**")
 
-                # creating settings menu
-                if configurable:
-                    v_slots = [{"name": "activator", "variable": "x", "children": btn}]
-                    with solara.Div(
-                        style={
-                            "display": "flex",
-                            "flex-wrap": "wrap",
-                            "gap": "8px",
-                            "margin-left": "auto",
-                        }
-                    ):
-                        with v.Menu(v_slots=v_slots, close_on_content_click=False):
-                            with v.Sheet():
-                                with v.Container(py_0=True, px_3=True, ma_0=True):
-                                    with v.Row():
-                                        with v.Col():
-                                            v.Switch(
-                                                v_model=invert,
-                                                on_v_model=set_invert,
-                                                label="Invert filter"
-                                            )
-                                            v.Switch(
-                                                v_model=multiple,
-                                                on_v_model=set_multiple,
-                                                label="Select multiple"
-                                            )
+                with solara.Div(
+                    style={
+                        "display": "flex",
+                        "flex-wrap": "wrap",
+                        "gap": "8px",
+                        "margin-left": "auto",
+                    }
+                ):
+                    # creating settings menu
+                    if configurable:
+                        SettingsMenu(
+                            btn,
+                            invert,
+                            set_invert,
+                            multiple=multiple,
+                            set_multiple=set_multiple
+                        )
+
+                    if on_remove is not None:
+                        RemoveConditionButton(on_remove, filter_id)
 
                 # creating selection dropdown
                 label = (
@@ -249,9 +300,10 @@ def CrossFilterSlider(
     filter_id: str,
     set_mask: Callable,
     initial_value=None,
-    invert=False,
+    on_remove=None,
+    invert: bool = False,
     mode: str = ">=",
-    configurable=True,
+    configurable: bool = True,
 ):
     """A Slider widget that will cross filter an astropy Table.
 
@@ -265,6 +317,7 @@ def CrossFilterSlider(
     - `filter_id`: The unique filter instance ID.
     - `set_mask`: Callback for updating filter's mask.
     - `initial_value`: The initial value to set for the slider.
+    - `on_remove`: Callback to remove this filter from parent filter list.
     - `invert`: If True, the filter will be inverted.
     - `mode`: The mode to use for filtering. Can be one of `==`, `>=`, `<=`, `>`, `<`.
     - `configurable`: Whether to show a configuration button.
@@ -308,7 +361,6 @@ def CrossFilterSlider(
 
     solara.use_memo(update_filter, dependencies=[filter_value, invert, mode])
 
-    # TODO: reacton bug, see CrossFilterSelect
     with v.Btn(v_on="x.on", icon=True) as btn:
         v.Icon(children=["mdi-settings"])
 
@@ -316,60 +368,55 @@ def CrossFilterSlider(
         label = f"Condition {mode} " if not invert else f"Drop condition {mode} "
         if filter_value is not None:
             label = label + f"{filter_value}"
-        with solara.Div(style={"width": "100%"}):
-            with solara.Row(
+        with solara.Row(
+            style={
+                "flex-wrap": "wrap",
+                "align-items": "center",
+                "gap": "12px",
+            }
+        ):
+            solara.Markdown(f"**{column}**")
+
+            with solara.Div(
                 style={
+                    "display": "flex",
                     "flex-wrap": "wrap",
-                    "align-items": "center",
-                    "gap": "12px",
+                    "gap": "8px",
+                    "margin-left": "auto",
                 }
             ):
-                solara.Markdown(f"**{column}**")
 
                 # creating settings menu
                 if configurable:
-                    with solara.Div(
-                        style={
-                            "display": "flex",
-                            "flex-wrap": "wrap",
-                            "gap": "8px",
-                            "margin-left": "auto",
-                        }
-                    ):
-                        v_slots = [{"name": "activator", "variable": "x", "children": btn}]
-                        with v.Menu(v_slots=v_slots, close_on_content_click=False):
-                            with v.Sheet():
-                                with v.Container(py_0=True, px_3=True, ma_0=True):
-                                    with v.Row():
-                                        with v.Col():
-                                            v.Switch(
-                                                v_model=invert,
-                                                on_v_model=set_invert,
-                                                label="Invert filter"
-                                            )
+                    SettingsMenu(
+                        btn,
+                        invert,
+                        set_invert,
+                        mode=mode,
+                        set_mode=set_mode
+                    )
 
-                                            FilterModeButtons(
-                                                mode=mode,
-                                                set_mode=set_mode,
-                                            )
-                solara.Markdown(label)
-            slider_args = {
-                "label": "",
-                "value": filter_value,
-                "min": vmin,
-                "max": vmax,
-                "step": step_size(vmin, vmax),
-                "on_value": set_filter_value,
-                "thumb_label": True,
-                "tick_labels": False,
-            }
-            # creating slider
-            if issubclass(py_types[column], (int, np.integer)):
-                solara.SliderInt(*slider_args)
-            elif issubclass(py_types[column], (float, np.floating)):
-                solara.SliderFloat(*slider_args)
-            else:
-                solara.Warning(f"{py_types[column]} not supported for Slider")
+                if on_remove is not None:
+                    RemoveConditionButton(on_remove, filter_id)
+
+        solara.Markdown(label, style={"color": "#6c6c6c", "font-size": "0.85em"})
+        slider_args = {
+            "label": "",
+            "value": filter_value,
+            "min": vmin,
+            "max": vmax,
+            "step": step_size(vmin, vmax),
+            "on_value": set_filter_value,
+            "thumb_label": True,
+            "tick_labels": False,
+        }
+        # creating slider
+        if issubclass(py_types[column], (int, np.integer)):
+            solara.SliderInt(**slider_args)
+        elif issubclass(py_types[column], (float, np.floating)):
+            solara.SliderFloat(**slider_args)
+        else:
+            solara.Warning(f"{py_types[column]} not supported for Slider")
 
     return main
 
@@ -522,7 +569,7 @@ def CrossFilterMastTable(observations):
             if drawer_open:
                 with solara.Card(
                     style="""
-                    width: 320px;
+                    width: 320px !important;
                     flex-shrink: 0;
                     overflow-y: auto;
                     """
@@ -557,6 +604,7 @@ def CrossFilterMastTable(observations):
                                 style={
                                     "border": "2px solid #00627e",
                                     "box-shadow": "none",
+                                    "width": "100%",
                                 }
                             ):
                                 opt = slide_or_select(observations, f["column"])
@@ -569,6 +617,7 @@ def CrossFilterMastTable(observations):
                                         set_mask=set_mask,
                                         mode=f["mode"],
                                         initial_value=initial_val,
+                                        on_remove=remove_filter
                                     )
                                 else:
                                     CrossFilterSelect(
@@ -577,13 +626,9 @@ def CrossFilterMastTable(observations):
                                         filter_id=f["id"],
                                         set_mask=set_mask,
                                         initial_values=initial_val,
+                                        on_remove=remove_filter
                                     )
-                                with solara.Row(justify="end"):
-                                    solara.Button(
-                                        icon_name="mdi-close",
-                                        on_click=lambda id=f["id"]: remove_filter(id),
-                                        style={"background-color": "#00627e", "color": "white"}
-                                    )
+
                     if not len(filters):
                         solara.Markdown("No active conditions")
 
