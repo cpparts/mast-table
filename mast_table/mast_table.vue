@@ -1,5 +1,11 @@
 <template>
   <v-row class="mast-table">
+    <v-col cols="auto">
+      <v-btn class="{'conditions-active': filter_tray_open}" @click="filter_tray_open = !filter_tray_open" :color="filter_tray_open ? '#b4dbe9' : undefined">
+        Conditions
+        <v-icon right>mdi-filter</v-icon>
+      </v-btn>
+    </v-col>
   <div v-if="show_if_empty || items.length">
     <v-col style="max-width: 400px;">
       <div class="row-select">
@@ -44,23 +50,23 @@
       </div>
       </v-col>
     </div>
-  
-  <jupyter-widget :widget="popout_button"></jupyter-widget>
+  <div class="toolbar-icons">
+    <jupyter-widget :widget="popout_button"></jupyter-widget>
 
-  <v-menu v-model="menu_open" :close-on-content-click="false" anchor="start end">
-    <template v-slot:activator="{ on }">
-      <v-btn v-on="on" icon><v-icon>mdi-menu</v-icon></v-btn>
-    </template>
+    <v-menu v-model="menu_open" :close-on-content-click="false" anchor="start end">
+      <template v-slot:activator="{ on }">
+        <v-btn v-on="on" icon><v-icon>mdi-menu</v-icon></v-btn>
+      </template>
 
-    <v-card min-width="300">
-      <v-list>
-        <v-list-item>
-          <v-switch v-model="show_tooltips" color="#00617e" label="Show column definition on hover"></v-switch>
-        </v-list-item>
-      </v-list>
-    </v-card>
-  </v-menu>
-
+      <v-card min-width="300">
+        <v-list>
+          <v-list-item>
+            <v-switch v-model="show_tooltips" color="#00617e" label="Show column definition on hover"></v-switch>
+          </v-list-item>
+        </v-list>
+      </v-card>
+    </v-menu>
+  </div>
 
   <v-col class="d-flex justify-end">
   <template v-if="show_load_buttons">
@@ -126,7 +132,7 @@
 
 <script>
 module.exports = {
-  props: ['column_descriptions', 'show_tooltips', 'popout_button'],
+  props: ['column_descriptions', 'show_tooltips', 'popout_button', 'filter_tray_open'],
   computed: {
     headers_visible_sorted() {
       return this.headers_avail.filter(item => this.headers_visible.indexOf(item) !== -1);
@@ -216,9 +222,18 @@ module.exports = {
   color: black !important;
 }
 .row-select {
+  position: relative;
+  top: 6px;
   .v-label {
     color: light-dark(black, white) !important;
   }
+}
+.toolbar-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  top: -3px;
 }
 .v-data-table tbody tr:nth-of-type(even) {
     background-color: light-dark(#f1f2f7, black);
