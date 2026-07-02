@@ -1,8 +1,9 @@
 
 import os
+import re
 import warnings
 
-from traitlets import List, Unicode, Bool, Int, Any, observe
+from traitlets import List, Unicode, Bool, Int, Dict, Any, observe
 from ipypopout import PopoutButton
 from ipyvuetify import VuetifyTemplate
 from ipywidgets.widgets import widget_serialization
@@ -26,17 +27,103 @@ col_unique_row_index = '_unique_row_index'
 _table_widgets = dict()
 
 
+def _format_value(value, fmt):
+    """
+    Apply an astropy ``Column.info.format`` spec to a single ``value``.
+
+    Supports new-style format specs (e.g. ``'.3f'``), printf-style specs
+    (e.g. ``'%.3f'``), and callables. Falls back to the raw value if the
+    format cannot be applied. NaN values are returned as an empty string
+    so the UI shows a blank cell instead of ``'nan'``.
+    """
+    if fmt is None:
+        return value
+    try:
+        if isinstance(value, float) and np.isnan(value):
+            return ''
+    except (TypeError, ValueError):
+        pass
+    if callable(fmt):
+        try:
+            return fmt(value)
+        except Exception:
+            return value
+    try:
+        return format(value, fmt)
+    except (ValueError, TypeError):
+        pass
+    try:
+        return fmt % value
+    except (ValueError, TypeError):
+        return value
+
+
+def _json_safe(value):
+    """
+    Convert a single cell ``value`` to a JSON-safe representation for the
+    frontend, with no per-column precision logic. Per-column precision is
+    handled separately via :func:`_format_value` driven by
+    ``Column.info.format``.
+    """
+    if isinstance(value, SkyCoord):
+        return value.to_string('hmsdms', precision=4)
+    if isinstance(value, u.Quantity):
+        if value.isscalar and np.isnan(value.value):
+            return ''
+        if value.isscalar:
+            return f"{value.value} {value.unit.to_string()}"
+        return {"value": value.value.tolist(), "unit": str(value.unit)}
+    if isinstance(value, np.floating):
+        v = float(value)
+        return '' if np.isnan(v) else v
+    if isinstance(value, float) and np.isnan(value):
+        return ''
+    if isinstance(value, np.bool_):
+        return bool(value)
+    if hasattr(value, 'tolist'):
+        try:
+            return value.tolist()
+        except (TypeError, ValueError):
+            pass
+    return value
+
+
 def serialize(table):
     """
-    Convert an astropy table to a list of dictionaries
-    containing each column as a list of pure Python objects.
+    Convert an astropy table to a list of dictionaries of JSON-safe values.
+
+    Per-column print precision is taken from each column's
+    ``Column.info.format`` attribute, so users can configure precision via
+    standard astropy machinery, e.g.::
+
+        table['flux'].info.format = '.3e'
+        table['ra'].info.format = '%.5f'
     """
-    return [
-        {
-            k: v.tolist()
-            for k, v in dict(row).items()
-        } for row in table
+    column_names = table.colnames
+
+    def _replace_nan(value):
+        if 'nan' in value:
+            value = ''
+        return value
+
+    def nan_to_empty_str(column):
+        nans_found = re.findall('nan', ''.join(column))
+        if len(nans_found):
+            column = [_replace_nan(row) for row in column]
+        return column
+
+    formatted_rows = list(zip(*[
+        nan_to_empty_str(
+            table[col].pformat(show_name=False, show_unit=False)
+        )
+        for col in column_names
+    ]))
+
+    serialized = [
+        {name: f"{val}" for name, val in zip(column_names, row)}
+        for row in formatted_rows
     ]
+    return serialized
 
 
 known_unique_mast_table_cols = [
@@ -73,6 +160,11 @@ class MastTable(VuetifyTemplate):
     mission = Unicode().tag(sync=True)
     filter_tray_open = Bool(True).tag(sync=True)
 
+    # Server-side pagination traitlets
+    server_pagination = Bool(True).tag(sync=True)
+    server_items_length = Int(0).tag(sync=True)
+    table_options = Dict({}).tag(sync=True)
+
     # item_key is a column of the table with unique values
     # for each row, enabling selection of the row by lookup
     item_key = Unicode().tag(sync=True)
@@ -107,13 +199,22 @@ class MastTable(VuetifyTemplate):
             and a warning will be raised..
         """
 
+        # initialize the row cache, so the ``table_options`` observer is safe to fire
+        # if that traitlet is passed in via ``kwargs``.
+        self._all_items = []
+
         super().__init__(**kwargs)
         self.popout_button = PopoutButton(self)
         self.table = table
         self.table[col_unique_row_index] = np.arange(len(table))
         self.app = app
 
-        self.items = serialize(table)
+        if not self.table_options:
+            self.table_options = {'page': 1, 'itemsPerPage': self.items_per_page}
+
+        self._all_items = serialize(table)
+        self.server_items_length = len(self._all_items)
+        self._push_current_page()
         self.mission = validate.detect_mission_or_products(table)
         columns = table.colnames
         self.column_descriptions = validate.get_column_descriptions(self.mission)
@@ -155,6 +256,27 @@ class MastTable(VuetifyTemplate):
 
             # change the coordinate frame to match the coordinates in the MAST table:
             self.app.target = f"{center_coord.ra.degree} {center_coord.dec.degree}"
+
+    @observe('table_options')
+    def _table_options_changed(self, msg):
+        if not self.server_pagination or not self._all_items:
+            return
+        self._push_current_page()
+
+    def _push_current_page(self):
+        """Push only the current page slice of ``_all_items`` to ``items``."""
+        if not self.server_pagination:
+            self.items = list(self._all_items)
+            return
+        opts = self.table_options or {}
+        page = opts.get('page', 1)
+        per_page = opts.get('itemsPerPage', self.items_per_page)
+        if per_page == -1:
+            self.items = list(self._all_items)
+            return
+        start = (page - 1) * per_page
+        end = start + per_page
+        self.items = self._all_items[start:end]
 
     def _set_item_key(self, table_columns, item_key, n_rows_slow=10e6):
         """
