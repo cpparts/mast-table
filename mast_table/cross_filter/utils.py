@@ -131,7 +131,6 @@ def build_select_filter_preview(
     """
     value_counts = table_value_count(table, column, limit=max_unique + 1)
     value_counts.rename_column('count', 'count_max')
-    value_counts_filtered = []
 
     if table_filtered:
         value_counts_filtered = table_value_count(

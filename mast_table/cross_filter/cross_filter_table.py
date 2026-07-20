@@ -123,6 +123,7 @@ def CrossFilterSelect(
     column: str,
     filter_id: str,
     set_mask: Callable,
+    table_filtered: Table,
     initial_values=None,
     on_remove=None,
     max_unique: int = 100,
@@ -169,8 +170,6 @@ def CrossFilterSelect(
         clear_not_multiple,
         [multiple]
     )
-
-    table_filtered = table
 
     items, value_counts = build_select_filter_preview(
         table,
@@ -604,13 +603,37 @@ def CrossFilterMastTable(table, **kwargs):
                                         on_remove=remove_filter
                                     )
                                 else:
+                                    other_masks = [
+                                        mask
+                                        for fid, mask in filter_masks.items()
+                                        if fid != f["id"] and mask is not None
+                                    ]
+
+                                    if not other_masks:
+                                        table_filtered = table
+                                    elif pending_reducer == "AND":
+                                        table_filtered = table[
+                                            functools.reduce(
+                                                operator.and_,
+                                                other_masks
+                                            )
+                                        ]
+                                    else:
+                                        table_filtered = table[
+                                            functools.reduce(
+                                                operator.or_,
+                                                other_masks
+                                            )
+                                        ]
+
                                     CrossFilterSelect(
                                         table,
                                         f["column"],
                                         filter_id=f["id"],
                                         set_mask=set_mask,
                                         initial_values=initial_val,
-                                        on_remove=remove_filter
+                                        on_remove=remove_filter,
+                                        table_filtered=table_filtered
                                     )
 
                     if not len(filters):
@@ -689,22 +712,19 @@ def CrossFilterMastTable(table, **kwargs):
                             table[pending_column]
                         )
 
+                        table_filtered = table[combined_mask] if combined_mask is not None else None
+
                         max_unique = 100
 
                         items, value_counts = build_select_filter_preview(
                             table,
                             pending_column,
-                            max_unique=max_unique
+                            max_unique=max_unique,
+                            table_filtered=table_filtered,
                         )
 
                         value = (
-                            ({"value": unique_values[0]} if unique_values else None)
-                        )
-
-                        value = (
-                            {"value": pending_value}
-                            if pending_value is not None
-                            else None
+                            {"value": unique_values[0]} if unique_values else None
                         )
 
                         def set_pending_select_value(selection):
@@ -722,7 +742,7 @@ def CrossFilterMastTable(table, **kwargs):
                             return_object=True,
                             multiple=False,
                             filtered=pending_value is not None,
-                            count=len(table),
+                            count=len(table_filtered) if table_filtered is not None else len(table),
                             messages=(
                                 f"Too many unique values, will only show the first {max_unique}"
                                 if len(value_counts) > max_unique else ""
