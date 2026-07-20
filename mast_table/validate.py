@@ -79,7 +79,7 @@ list_products = [
 ]
 
 
-def mast_unique_columns(update=True):
+def get_mast_unique_columns(update=True):
     """
     Return a dictionary of columns in observation query
     results from astroqery.mast.missions.MastMissions
@@ -88,7 +88,7 @@ def mast_unique_columns(update=True):
     To update the cached columns, run:
 
         from mast_table import validate
-        validate.mast_unique_columns(update=True)
+        validate.get_mast_unique_columns(update=True)
     """
     from astroquery.mast import MastMissions
 
