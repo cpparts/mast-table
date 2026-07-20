@@ -1,13 +1,10 @@
 import json
 import os
-from collections import defaultdict
 
 
 # locations for metadata from MissionMAST:
 missions = ['jwst', 'roman', 'hst']
-table_data_dir = os.path.join(os.path.dirname(__file__), 'data')
-unique_column_path = os.path.join(table_data_dir, 'unique_columns_per_mission.json')
-column_descriptions_path = os.path.join(table_data_dir, 'column_descriptions.json')
+unique_column_path = os.path.join(os.path.dirname(__file__), 'data/unique_columns_per_mission.json')
 
 # manual definitions for `list_products` queries:
 list_products = [
@@ -82,7 +79,7 @@ list_products = [
 ]
 
 
-def update_mast_column_lists(update_column_descriptions=True, update_unique_columns=True):
+def mast_unique_columns(update=True):
     """
     Return a dictionary of columns in observation query
     results from astroqery.mast.missions.MastMissions
@@ -91,7 +88,7 @@ def update_mast_column_lists(update_column_descriptions=True, update_unique_colu
     To update the cached columns, run:
 
         from mast_table import validate
-        validate.update_mast_column_lists()
+        validate.mast_unique_columns(update=True)
     """
     from astroquery.mast import MastMissions
 
@@ -99,32 +96,14 @@ def update_mast_column_lists(update_column_descriptions=True, update_unique_colu
 
     columns_available = dict()
     unique_columns = dict()
-    column_descriptions = defaultdict(list)
 
     for mission in missions:
         mast.mission = mission
         column_list = mast.get_column_list()
-
-        for row in column_list.iterrows():
-            column_descriptions[mission].append(
-                {k: str(v).strip() for k, v in zip(column_list.colnames, row)}
-            )
-
         column_names = column_list['name'].tolist()
         columns_available[mission] = set(sorted(column_names))
 
     columns_available['list_products'] = set(sorted(col['name'] for col in list_products))
-    column_descriptions['list_products'] = sorted(list_products, key=lambda x: x['name'])
-
-    if update_column_descriptions:
-        with open(column_descriptions_path, 'w') as json_file:
-            json.dump(
-                column_descriptions,
-                json_file,
-                indent=4,
-                sort_keys=True
-            )
-
     compare_to_missions = missions + ['list_products']
 
     for mission in compare_to_missions:
@@ -141,7 +120,7 @@ def update_mast_column_lists(update_column_descriptions=True, update_unique_colu
             )
         )
 
-    if update_unique_columns:
+    if update:
         with open(unique_column_path, 'w') as json_file:
             json.dump(
                 unique_columns,
@@ -150,7 +129,7 @@ def update_mast_column_lists(update_column_descriptions=True, update_unique_colu
                 sort_keys=True
             )
 
-    return unique_columns, column_descriptions
+    return unique_columns
 
 
 def detect_mission_or_products(table):
@@ -166,6 +145,16 @@ def detect_mission_or_products(table):
             return mission
 
 
-def get_column_descriptions(mission):
-    column_descriptions = json.load(open(column_descriptions_path, 'r'))
-    return column_descriptions[mission]
+def get_column_descriptions(mission, table):
+    if mission == "list_products":
+        return list_products
+
+    column_descriptions = [
+        {
+            "name": col,
+            "description": table[col].meta.get("description")
+        }
+        for col in table.colnames
+    ]
+
+    return column_descriptions
