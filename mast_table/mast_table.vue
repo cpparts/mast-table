@@ -93,7 +93,7 @@
         @click="open_selected_rows_in_jdaviz"
         ><v-icon>mdi-open-in-app</v-icon>jdaviz</v-btn>
       </template>
-      <div style="text-align: center;"">Download, open <br />selection in jdaviz</div>
+      <div style="text-align: center;"">Download, open<br />selection in jdaviz</div>
     </v-tooltip>
 </template>
 </v-col>

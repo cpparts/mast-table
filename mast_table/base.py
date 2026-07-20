@@ -27,6 +27,13 @@ col_unique_row_index = '_unique_row_index'
 _table_widgets = dict()
 
 
+mission_mast_ra_dec_colnames = dict(
+    hst=['sci_ra', 'sci_dec'],
+    roman=['ra', 'dec'],
+    jwst=['targ_ra', 'targ_def'],
+)
+
+
 def _format_value(value, fmt):
     """
     Apply an astropy ``Column.info.format`` spec to a single ``value``.
@@ -157,7 +164,7 @@ class MastTable(VuetifyTemplate):
     clear_btn_lbl = Unicode('Clear Table').tag(sync=True)
     popout_button = Any().tag(sync=True, **widget_serialization)
     enable_load_in_app = Bool(False).tag(sync=True)
-    mission = Unicode().tag(sync=True)
+    mission = Unicode(allow_none=True).tag(sync=True)
     filter_tray_open = Bool(True).tag(sync=True)
 
     # Server-side pagination traitlets
@@ -172,7 +179,15 @@ class MastTable(VuetifyTemplate):
     table = None
     row_select_callbacks = []
 
-    def __init__(self, table, app=None, update_viewport=True, unique_column=None, **kwargs):
+    def __init__(
+            self,
+            table,
+            app=None,
+            update_viewport=True,
+            unique_column=None,
+            ra_column=None,
+            dec_column=None,
+            **kwargs):
         """
         Parameters
         ----------
@@ -196,7 +211,17 @@ class MastTable(VuetifyTemplate):
             search through the table to find a column with unique rows.
 
             For tables with many rows, unique column searches are inefficient
-            and a warning will be raised..
+            and a warning will be raised.
+
+        ra_column : str (optional, default is `None`)
+            Column name for the right ascension in degrees.
+
+        dec_column : str (optional, default is `None`)
+            Column name for the declination in degrees.
+
+        **kwargs
+            Remaining keyword arguments are passed to
+            ``ipyvuetify.VuetifyTemplate``.
         """
 
         # initialize the row cache, so the ``table_options`` observer is safe to fire
@@ -204,6 +229,7 @@ class MastTable(VuetifyTemplate):
         self._all_items = []
 
         super().__init__(**kwargs)
+
         self.popout_button = PopoutButton(self)
         self.table = table
         self.table[col_unique_row_index] = np.arange(len(table))
@@ -212,17 +238,12 @@ class MastTable(VuetifyTemplate):
         if not self.table_options:
             self.table_options = {'page': 1, 'itemsPerPage': self.items_per_page}
 
-        self._all_items = serialize(table)
+        self._all_items = serialize(self.table)
         self.server_items_length = len(self._all_items)
         self._push_current_page()
-        self.mission = validate.detect_mission_or_products(table)
-        columns = table.colnames
-        self.column_descriptions = validate.get_column_descriptions(self.mission)
+        columns = self.table.colnames
 
-        if item_key := kwargs.get('item_key', None):
-            self.item_key = item_key
-        else:
-            self._set_item_key(columns, unique_column)
+        self._set_item_key(columns, unique_column)
 
         self.headers_avail = [
             column for column in columns if column != col_unique_row_index
@@ -230,9 +251,6 @@ class MastTable(VuetifyTemplate):
 
         # by default, remove the `s_region`` column
         # from the visible columns in the widget:
-        if 's_region' in columns:
-            columns.remove('s_region')
-
         self.headers_visible = [
             column for column in self.headers_avail
             if column != 's_region'
@@ -240,22 +258,32 @@ class MastTable(VuetifyTemplate):
 
         _table_widgets[len(_table_widgets)] = self
 
-        if update_viewport and self.app is not None:
-            ra_dec_colnames = dict(
-                hst=['sci_ra', 'sci_dec'],
-                roman=['ra_ref', 'dec_ref'],
-                jwst=['targ_ra', 'targ_def'],
-            )
-            ra_column, dec_column = ra_dec_colnames[self.mission]
+        if mission := validate.detect_mission_or_products(table):
+            self.column_descriptions = validate.get_column_descriptions(mission)
 
-            center_coord = SkyCoord(
-                ra=table[ra_column][0] * u.deg,
-                dec=table[dec_column][0] * u.deg,
+            # if the user hasn't defined the ra/dec columns, use
+            # the expectated Mission Mast names for this mission:
+            if ra_column is None and dec_column is None:
+                ra_column, dec_column = mission_mast_ra_dec_colnames[mission]
+
+        # if the ra/dec columns are available in the table:
+        if (
+                ra_column in columns and
+                dec_column in columns and
+                update_viewport and
+                self.app is not None):
+
+            # use the first sky coordinate as a reference for centering the viewer.
+            # an alternative would be to use e.g. mean(RA), though means would return an
+            # unhelpful coordinate in the case where observations span the meridian or poles.
+            reference_coord = SkyCoord(
+                ra=self.table[ra_column][0] * u.deg,
+                dec=self.table[dec_column][0] * u.deg,
                 unit=u.deg
             )
 
-            # change the coordinate frame to match the coordinates in the MAST table:
-            self.app.target = f"{center_coord.ra.degree} {center_coord.dec.degree}"
+            # set the center of the viewer on the reference coord:
+            self.app.target = f"{reference_coord.ra.degree} {reference_coord.dec.degree}"
 
     @observe('table_options')
     def _table_options_changed(self, msg):

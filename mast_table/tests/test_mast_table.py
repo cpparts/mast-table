@@ -1,5 +1,5 @@
 from mast_table import MastTable
-from mast_table.mast_table import serialize
+from mast_table.base import serialize
 import numpy as np
 import astropy.units as u
 from astropy.table import Table

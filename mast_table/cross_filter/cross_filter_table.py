@@ -12,7 +12,7 @@ from solara.components.cross_filter import Select
 import reacton.ipyvuetify as v
 
 from astropy.table import Table, join
-from mast_table.mast_table import MastTable, serialize, col_unique_row_index
+from mast_table.base import MastTable, serialize, col_unique_row_index
 from mast_table.cross_filter.utils import (
     table_py_types, table_value_count, table_filter_values,
     table_range, slide_or_select, step_size, build_select_items,
@@ -190,7 +190,6 @@ def CrossFilterSelect(
         value_counts['exists'] = False
         value_counts['count_max'] = False
 
-    value_counts = value_counts.filled(0)
     value_counts["exists"] = value_counts["count"] > 0
     value_counts.sort('value')
 
@@ -210,9 +209,16 @@ def CrossFilterSelect(
     solara.use_memo(reset, dependencies=[column])
 
     def update_filter():
+        if hasattr(table[column], 'mask'):
+            unmasked_values_as_strings = (
+                list(table[column].data[~table[column].mask].astype(str)) +
+                ['--']  # masked value
+            )
+        else:
+            unmasked_values_as_strings = table[column].astype(str)
         if (
             len(filter_values) == 0 or
-            (not invert and set(filter_values) >= set(np.unique(table[column].astype(str))))
+            (not invert and set(filter_values).issuperset(unmasked_values_as_strings))
         ):
             set_mask(filter_id, None)
             return
@@ -453,7 +459,8 @@ def SelectableTable(
             table,
             item_key=col_unique_row_index,
             items_per_page=items_per_page,
-            filter_tray_open=drawer_open
+            filter_tray_open=drawer_open,
+            **kwargs
         )
         mt.observe(on_change, 'filter_tray_open')
         return mt
@@ -478,7 +485,7 @@ def SelectableTable(
 
 
 @solara.component
-def CrossFilterMastTable(observations):
+def CrossFilterMastTable(table, **kwargs):
     """A selectable table that participates in cross-filtering.
 
     * Incoming cross-filters from other components narrow which rows
@@ -490,7 +497,7 @@ def CrossFilterMastTable(observations):
     solara.provide_cross_filter()
 
     pending_column, set_pending_column = solara.use_state(
-        observations.colnames[0]
+        table.colnames[0]
     )
     pending_value, set_pending_value = solara.use_state("")
     pending_mode, set_pending_mode = solara.use_state(">=")
@@ -510,14 +517,14 @@ def CrossFilterMastTable(observations):
         ]
         set_filters(new_filters)
 
-        default_column = observations.colnames[0]
+        default_column = table.colnames[0]
         set_pending_column(default_column)
 
         set_pending_mode(">=")
 
-        opt = slide_or_select(observations, default_column)
+        opt = slide_or_select(table, default_column)
         if opt == "slider":
-            vmin, _ = table_range(observations, default_column)
+            vmin, _ = table_range(table, default_column)
             set_pending_value(vmin)
         else:
             set_pending_value("")
@@ -607,11 +614,11 @@ def CrossFilterMastTable(observations):
                                     "width": "100%",
                                 }
                             ):
-                                opt = slide_or_select(observations, f["column"])
+                                opt = slide_or_select(table, f["column"])
                                 initial_val = f["value"] if f.get("value") is not None else None
                                 if opt == "slider":
                                     CrossFilterSlider(
-                                        observations,
+                                        table,
                                         f["column"],
                                         filter_id=f["id"],
                                         set_mask=set_mask,
@@ -621,7 +628,7 @@ def CrossFilterMastTable(observations):
                                     )
                                 else:
                                     CrossFilterSelect(
-                                        observations,
+                                        table,
                                         f["column"],
                                         filter_id=f["id"],
                                         set_mask=set_mask,
@@ -634,14 +641,20 @@ def CrossFilterMastTable(observations):
 
                     # creating add condition section
                     solara.Markdown("##Add condition")
+
+                    column_names = table.colnames
+                    if col_unique_row_index in column_names:
+                        # never give the internal unique column as an option
+                        column_names.remove(col_unique_row_index)
+
                     v.Select(
                         label="Column",
-                        items=observations.colnames,
+                        items=column_names,
                         v_model=pending_column,
                         on_v_model=set_pending_column,
                     )
 
-                    opt = slide_or_select(observations, pending_column)
+                    opt = slide_or_select(table, pending_column)
                     fully_masked = False
 
                     # creating slide/select based on column user selects
@@ -660,9 +673,9 @@ def CrossFilterMastTable(observations):
                                 set_mode=set_pending_mode,
                             )
 
-                        vmin, vmax = table_range(observations, pending_column)
+                        vmin, vmax = table_range(table, pending_column)
 
-                        py_types = table_py_types(observations)
+                        py_types = table_py_types(table)
 
                         if pending_value in ("", None):
                             pending_value = vmin
@@ -696,7 +709,7 @@ def CrossFilterMastTable(observations):
 
                     else:
                         unique_values, fully_masked = build_select_items(
-                            observations[pending_column]
+                            table[pending_column]
                         )
 
                         v.Select(
@@ -720,12 +733,13 @@ def CrossFilterMastTable(observations):
 
             with solara.Column(style="flex: 1; overflow: auto; min-height: 0"):
                 filtered_table = (
-                    observations[combined_mask]
+                    table[combined_mask]
                     if combined_mask is not None
-                    else observations
+                    else table
                 )
                 SelectableTable(
                     filtered_table,
                     drawer_open=drawer_open,
-                    set_drawer_open=set_drawer_open
+                    set_drawer_open=set_drawer_open,
+                    **kwargs
                 )

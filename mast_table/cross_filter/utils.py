@@ -28,14 +28,14 @@ def use_table_column_names(table) -> List[str]:
 
 
 def table_value_count(table, column, limit: int):
-    filled = table.group_by(
-        table[column].filled("MISSING") if hasattr(table[column], "mask") else table[column]
-    )
+    values, counts = np.unique(table[column], return_counts=True)
+
     return Table(
-        data=[{'value': str(group[column][0]), 'count': len(group[column])}
-              for i, group in enumerate(filled.groups)
-              if i < limit]
-        )
+        data=[{
+            'value': str(value),
+            'count': count
+            } for value, count in zip(values[:limit], counts[:limit])]
+    )
 
 
 def table_filter_values(table, column, values, invert=False):
@@ -45,13 +45,16 @@ def table_filter_values(table, column, values, invert=False):
     if "--" in values and hasattr(col, "mask"):
         filter |= col.mask
 
-    real_values = [v for v in values if v != "--"]
+    real_values = np.array([v for v in values if v != "--"])
+    column_data = col.data
+    dtype = column_data.dtype
 
-    if real_values:
+    if len(real_values):
+        real_value_in_column_data = np.isin(column_data, real_values.astype(dtype))
         if hasattr(col, "mask"):
-            filter |= (~col.mask) & np.isin(col.data, real_values)
+            filter |= (~col.mask) & real_value_in_column_data
         else:
-            filter |= np.isin(col, real_values)
+            filter |= real_value_in_column_data
 
     if invert:
         filter = ~filter
