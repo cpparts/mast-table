@@ -31,6 +31,7 @@ mission_mast_ra_dec_colnames = dict(
     hst=['sci_ra', 'sci_dec'],
     roman=['ra', 'dec'],
     jwst=['targ_ra', 'targ_def'],
+    list_products=['', ''],
 )
 
 
@@ -259,7 +260,7 @@ class MastTable(VuetifyTemplate):
         _table_widgets[len(_table_widgets)] = self
 
         if mission := validate.detect_mission_or_products(table):
-            self.column_descriptions = validate.get_column_descriptions(mission)
+            self.column_descriptions = validate.get_column_descriptions(mission, table)
 
             # if the user hasn't defined the ra/dec columns, use
             # the expectated Mission Mast names for this mission:
