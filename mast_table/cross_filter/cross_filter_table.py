@@ -11,11 +11,12 @@ import solara
 from solara.components.cross_filter import Select
 import reacton.ipyvuetify as v
 
-from astropy.table import Table, join
+from astropy.table import Table
 from mast_table.base import MastTable, serialize, col_unique_row_index
 from mast_table.cross_filter.utils import (
-    table_py_types, table_value_count, table_filter_values,
-    table_range, slide_or_select, step_size, build_select_items,
+    table_py_types, table_filter_values, table_range,
+    slide_or_select, step_size, build_select_items,
+    build_select_filter_preview,
 )
 
 
@@ -122,6 +123,7 @@ def CrossFilterSelect(
     column: str,
     filter_id: str,
     set_mask: Callable,
+    table_filtered: Table,
     initial_values=None,
     on_remove=None,
     max_unique: int = 100,
@@ -169,29 +171,12 @@ def CrossFilterSelect(
         [multiple]
     )
 
-    table_filtered = table
-
-    value_counts = table_value_count(table, column, limit=max_unique + 1)
-    value_counts.rename_column('count', 'count_max')
-
-    value_counts_filtered = table_value_count(
-        table_filtered, column, limit=max_unique + 1
+    items, value_counts = build_select_filter_preview(
+        table,
+        column,
+        max_unique=max_unique,
+        table_filtered=table_filtered
     )
-
-    if len(value_counts_filtered):
-        value_counts = join(
-            value_counts,
-            value_counts_filtered,
-            join_type="left",
-            keys="value"
-        )
-    else:
-        value_counts['count'] = 0
-        value_counts['exists'] = False
-        value_counts['count_max'] = False
-
-    value_counts["exists"] = value_counts["count"] > 0
-    value_counts.sort('value')
 
     def set_values_and_filter(values):
         if values is None:
@@ -228,15 +213,6 @@ def CrossFilterSelect(
 
     solara.use_memo(update_filter, dependencies=[filter_values, invert])
 
-    items = [
-        {
-            # calling tolist() casts to python types rather than np types
-            "value": row['value'].tolist(),
-            "text": str(row['value'].tolist()),
-            "count": row['count'].tolist(),
-            "count_max": row['count_max'].tolist(),
-        } for row in value_counts
-    ]
     value = (
         [{"value": v} for v in filter_values]
         if multiple
@@ -627,13 +603,37 @@ def CrossFilterMastTable(table, **kwargs):
                                         on_remove=remove_filter
                                     )
                                 else:
+                                    other_masks = [
+                                        mask
+                                        for fid, mask in filter_masks.items()
+                                        if fid != f["id"] and mask is not None
+                                    ]
+
+                                    if not other_masks:
+                                        table_filtered = table
+                                    elif pending_reducer == "AND":
+                                        table_filtered = table[
+                                            functools.reduce(
+                                                operator.and_,
+                                                other_masks
+                                            )
+                                        ]
+                                    else:
+                                        table_filtered = table[
+                                            functools.reduce(
+                                                operator.or_,
+                                                other_masks
+                                            )
+                                        ]
+
                                     CrossFilterSelect(
                                         table,
                                         f["column"],
                                         filter_id=f["id"],
                                         set_mask=set_mask,
                                         initial_values=initial_val,
-                                        on_remove=remove_filter
+                                        on_remove=remove_filter,
+                                        table_filtered=table_filtered
                                     )
 
                     if not len(filters):
@@ -712,11 +712,42 @@ def CrossFilterMastTable(table, **kwargs):
                             table[pending_column]
                         )
 
-                        v.Select(
+                        table_filtered = table[combined_mask] if combined_mask is not None else None
+
+                        max_unique = 100
+
+                        items, value_counts = build_select_filter_preview(
+                            table,
+                            pending_column,
+                            max_unique=max_unique,
+                            table_filtered=table_filtered,
+                        )
+
+                        value = (
+                            {"value": unique_values[0]} if unique_values else None
+                        )
+
+                        def set_pending_select_value(selection):
+                            if selection is None:
+                                set_pending_value("")
+                            else:
+                                set_pending_value(selection["value"])
+
+                        Select.element(
+                            value=value,
+                            items=items,
+                            on_value=set_pending_select_value,
                             label="Value",
-                            items=unique_values,
-                            v_model=pending_value,
-                            on_v_model=set_pending_value,
+                            clearable=False,
+                            return_object=True,
+                            multiple=False,
+                            filtered=pending_value is not None,
+                            count=len(table_filtered) if table_filtered is not None else len(table),
+                            messages=(
+                                f"Too many unique values, will only show the first {max_unique}"
+                                if len(value_counts) > max_unique else ""
+                            ),
+                            class_="solara-cross-filter-select",
                         )
 
                     with solara.Row(justify="end"):

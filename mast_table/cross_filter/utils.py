@@ -1,6 +1,6 @@
 from typing import List
 import numpy as np
-from astropy.table import Table
+from astropy.table import Table, join
 import math
 
 
@@ -105,3 +105,63 @@ def build_select_items(col):
     vals = np.asarray(unmasked).astype(str)
     items = np.unique(vals).tolist()
     return items, fully_masked
+
+
+def build_select_filter_preview(
+    table,
+    column,
+    max_unique=100,
+    table_filtered=None,
+):
+    """
+    Determines the items and value_counts for a given column used to generate
+    filter preview information for columns that use `select` logic.
+
+    Parameters
+    ----------
+    - `table`: The astropy Table to filter.
+    - `column`: The column to filter on.
+    - `max_unique`: The maximum number of unique values to show in the dropdown.
+    - `table_filtered`: The filtered astropy Table.
+
+    Returns
+    -------
+    - `items`: List of dictionaries containing information for each unique value.
+    - `value_counts`: The astropy Table of value counts for each unique value.
+    """
+    value_counts = table_value_count(table, column, limit=max_unique + 1)
+    value_counts.rename_column('count', 'count_max')
+
+    if table_filtered:
+        value_counts_filtered = table_value_count(
+            table_filtered, column, limit=max_unique + 1
+        )
+
+        if len(value_counts_filtered):
+            value_counts = join(
+                value_counts,
+                value_counts_filtered,
+                join_type="left",
+                keys="value"
+            )
+    else:
+        value_counts['count'] = value_counts['count_max']
+
+    if "count" not in value_counts.colnames:
+        value_counts["count"] = 0
+
+    value_counts = value_counts.filled(0)
+    value_counts["exists"] = value_counts["count"] > 0
+    value_counts.sort('value')
+
+    items = [
+        {
+            # calling tolist() casts to python types rather than np types
+            "value": row['value'].tolist(),
+            "text": str(row['value'].tolist()),
+            "count": row['count'].tolist(),
+            "count_max": row['count_max'].tolist(),
+        } for row in value_counts
+    ]
+
+    return items, value_counts
