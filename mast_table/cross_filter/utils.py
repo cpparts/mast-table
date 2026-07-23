@@ -1,33 +1,26 @@
-from typing import List
 import numpy as np
 from astropy.table import Table, join
 import math
+import warnings
 
 
-def py_type(dtype):
-    kind = dtype.kind.lower()
+def num_py_type(table, col):
+    """Return kind of numerical type for column of a table."""
+    dtype = table[col].dtype
+    kind = dtype.kind
     if kind in "iu":
         return int
     elif kind == "f":
         return float
-    elif kind == "b":
-        return bool
-    return dtype
-
-
-def table_py_types(table):
-    return {
-        column: py_type(dtype)
-        for column, (dtype, _) in table.dtype.fields.items()
-    }
-
-
-def use_table_column_names(table) -> List[str]:
-    """Return a list of column names from a table."""
-    return table.colnames
+    else:
+        warnings.warn(
+            f"Column {col} of datatype {dtype} not supported for Slider",
+            UserWarning
+        )
 
 
 def table_value_count(table, column, limit: int):
+    """Return values and counts for column of a table."""
     values, counts = np.unique(table[column], return_counts=True)
 
     return Table(
@@ -39,6 +32,7 @@ def table_value_count(table, column, limit: int):
 
 
 def table_filter_values(table, column, values, invert=False):
+    """Return filter for column of a table."""
     col = table[column]
     filter = np.zeros(len(table), dtype=bool)
 
@@ -63,6 +57,7 @@ def table_filter_values(table, column, values, invert=False):
 
 
 def table_range(table, column):
+    """Return range for column of a table."""
     return table[column].min().tolist(), table[column].max().tolist()
 
 
@@ -70,6 +65,7 @@ def slide_or_select(
     table,
     column,
 ):
+    """Return type of filter to render for column of a table."""
     if not np.issubdtype(table[column].dtype, np.number):
         return "select"
     else:
@@ -86,6 +82,7 @@ def step_size(
     vmin,
     vmax
 ):
+    """Return stepsize for range of values."""
     rng = vmax-vmin
     step = rng/5 if rng <= 1 else 0.1
     decimals = max(0, int(-math.floor(math.log10(step)))) if step < 1 else 0
@@ -93,6 +90,7 @@ def step_size(
 
 
 def build_select_items(col):
+    """Return unique values for column and whether column is full masked."""
     unmasked = col
     fully_masked = False
 

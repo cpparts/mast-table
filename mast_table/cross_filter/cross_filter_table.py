@@ -14,7 +14,7 @@ import reacton.ipyvuetify as v
 from astropy.table import Table
 from mast_table.base import MastTable, serialize, col_unique_row_index
 from mast_table.cross_filter.utils import (
-    table_py_types, table_filter_values, table_range,
+    num_py_type, table_filter_values, table_range,
     slide_or_select, step_size, build_select_items,
     build_select_filter_preview,
 )
@@ -25,6 +25,15 @@ def FilterModeButtons(
     mode,
     set_mode,
 ):
+    """Comparison operator selector for slider widgets.
+
+    Parameters
+    ----------
+    - `mode`: The astropy Table to filter.
+    - `set_mode`: Callback for updating filter's mask.
+
+    """
+
     with solara.ToggleButtonsSingle(
         value=mode,
         on_value=set_mode,
@@ -71,6 +80,19 @@ def SettingsMenu(
     multiple=None,
     set_multiple=None
 ):
+    """A menu for widgets that manages options for mode, inversion, and multiple.
+
+    Parameters
+    ----------
+    - `btn`: Settings menu button
+    - `invert`: Whether to invert the selection.
+    - `set_invert`: Callback for updating filter's inversion.
+    - `mode`: The astropy Table to filter.
+    - `set_mode`: Callback for updating filter's mask.
+    - `multiple`: Whether to allow multiple values to be selected.
+    - `set_multiple`: Callback for updating filter's ability to select multiple values.
+
+    """
     v_slots = [{"name": "activator", "variable": "x", "children": btn}]
     with v.Menu(v_slots=v_slots, close_on_content_click=False):
         with v.Sheet():
@@ -98,7 +120,18 @@ def SettingsMenu(
 
 
 @solara.component
-def RemoveConditionButton(on_remove, filter_id):
+def RemoveConditionButton(
+    filter_id: str,
+    on_remove=None,
+):
+    """Button for removal of filter.
+
+    Parameters
+    ----------
+    - `filter_id`: The unique filter instance ID.
+    - `on_remove`: Callback to remove this filter from parent filter list.
+
+    """
     solara.Button(
         icon_name="mdi-close",
         on_click=lambda: on_remove(filter_id),
@@ -134,8 +167,8 @@ def CrossFilterSelect(
 ):
     """A Select widget that will cross filter an astropy Table.
 
-    ## Arguments
-
+    Parameters
+    ----------
     - `table`: The astropy Table to filter.
     - `column`: The column to filter on.
     - `filter_id`: The unique filter instance ID.
@@ -250,7 +283,7 @@ def CrossFilterSelect(
                         )
 
                     if on_remove is not None:
-                        RemoveConditionButton(on_remove, filter_id)
+                        RemoveConditionButton(filter_id, on_remove)
 
                 # creating selection dropdown
                 label = (
@@ -292,8 +325,8 @@ def CrossFilterSlider(
     See [use_cross_filter](/documentation/api/hooks/use_cross_filter)
     for more information about how to use cross filtering.
 
-    ## Arguments
-
+    Parameters
+    ----------
     - `table`: The astropy Table to filter.
     - `column`: The column to filter on.
     - `filter_id`: The unique filter instance ID.
@@ -315,7 +348,7 @@ def CrossFilterSlider(
 
     vmin, vmax = table_range(table, column)
 
-    py_types = table_py_types(table)
+    py_type = num_py_type(table, column)
 
     def reset():
         if initial_value is not None:
@@ -379,7 +412,7 @@ def CrossFilterSlider(
                     )
 
                 if on_remove is not None:
-                    RemoveConditionButton(on_remove, filter_id)
+                    RemoveConditionButton(filter_id, on_remove)
 
         solara.Markdown(label, style={"color": "#6c6c6c", "font-size": "0.85em"})
         slider_args = {
@@ -393,12 +426,10 @@ def CrossFilterSlider(
             "tick_labels": False,
         }
         # creating slider
-        if issubclass(py_types[column], (int, np.integer)):
+        if issubclass(py_type, (int, np.integer)):
             solara.SliderInt(**slider_args)
-        elif issubclass(py_types[column], (float, np.floating)):
+        elif issubclass(py_type, (float, np.floating)):
             solara.SliderFloat(**slider_args)
-        else:
-            solara.Warning(f"{py_types[column]} not supported for Slider")
 
     return main
 
@@ -416,6 +447,28 @@ def SelectableTable(
 
     Displays a paginated table with selectable rows.  Reports the
     indices (into *table*) of the currently selected rows.
+
+    Parameters
+    ----------
+    table : `~astropy.table.Table`
+        A table to load.
+
+    items_per_page : int (optional, default is 10)
+        Number of items to render on each page.
+
+    on_selected_indices : callable (optional, default is `None)
+        Callback on selected indices.
+
+    drawer_open : bool (optional, default is `True`)
+        If `True`, the CrossFilterMenu sidepanel is initialized
+        open.
+
+    set_drawer_open: callable (optional, default is `None)
+        Callback to open CrossFilterMenu sidepanel.
+
+    **kwargs
+        Remaining keyword arguments are passed to MastTable.
+
     """
     selected, set_selected = solara.use_state([])
 
@@ -469,6 +522,15 @@ def CrossFilterMastTable(table, **kwargs):
     * When the user checks rows, a filter is set so that *other*
       cross-filter consumers only see the selected rows.
     * Conditions are set and tracked in a popout window.
+
+    Parameters
+    ----------
+    table : `~astropy.table.Table`
+        A table to load.
+
+    **kwargs
+        Keyword arguments are passed to SelectableTable.
+
     """
     solara.provide_cross_filter()
 
@@ -675,7 +737,7 @@ def CrossFilterMastTable(table, **kwargs):
 
                         vmin, vmax = table_range(table, pending_column)
 
-                        py_types = table_py_types(table)
+                        py_type = num_py_type(table, pending_column)
 
                         if pending_value in ("", None):
                             pending_value = vmin
@@ -683,7 +745,7 @@ def CrossFilterMastTable(table, **kwargs):
                         label = f"Condition {pending_mode} {pending_value}"
                         solara.Markdown(label)
 
-                        if issubclass(py_types[pending_column], (int, np.integer)):
+                        if issubclass(py_type, (int, np.integer)):
                             solara.SliderInt(
                                 label="",
                                 value=int(pending_value),
@@ -695,7 +757,7 @@ def CrossFilterMastTable(table, **kwargs):
                                 tick_labels=False,
                             )
 
-                        elif issubclass(py_types[pending_column], (float, np.floating)):
+                        elif issubclass(py_type, (float, np.floating)):
                             solara.SliderFloat(
                                 label="",
                                 value=float(pending_value),
