@@ -9,7 +9,7 @@ dependencies = [
     "astroquery",
     "traitlets",
     "ipypopout",
-    "ipyvuetify",
+    "ipyvuetify == v1.11.3",
     "ipywidgets",
     "solara",
 ]
