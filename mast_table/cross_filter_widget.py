@@ -618,7 +618,10 @@ def MastTable(table, **kwargs):
             vmin, _ = table_range(table, default_column)
             set_pending_value(vmin)
         else:
-            set_pending_value("")
+            unique_values, _ = build_select_items(
+                table[default_column]
+            )
+            set_pending_value(unique_values[0] if unique_values else "")
 
     def remove_filter(filter_id):
         set_filters([f for f in filters if f["id"] != filter_id])
@@ -886,15 +889,41 @@ def MastTable(table, **kwargs):
                     # never give the internal unique column as an option
                     column_names.remove(col_unique_row_index)
 
+                # handling pending val initialization when col changes
+                def on_pending_column_change(column):
+                    set_pending_column(column)
+
+                    opt = slide_or_select(table, column)
+
+                    if opt == "slider":
+                        vmin, _ = table_range(table, column)
+                        set_pending_value(vmin)
+                    else:
+                        unique_values, _ = build_select_items(table[column])
+                        set_pending_value(
+                            unique_values[0] if unique_values else ""
+                        )
+
                 v.Autocomplete(
                     label="Column",
                     items=column_names,
                     v_model=pending_column,
-                    on_v_model=set_pending_column,
+                    on_v_model=on_pending_column_change,
                 )
 
                 opt = slide_or_select(table, pending_column)
                 fully_masked = False
+
+                # set initial column pending value
+                if pending_value in ("", None):
+                    if opt == "slider":
+                        vmin, vmax = table_range(table, pending_column)
+                        pending_value = vmin
+                    else:
+                        unique_values, fully_masked = build_select_items(
+                            table[pending_column]
+                        )
+                        pending_value = unique_values[0] if unique_values else ""
 
                 # creating slide/select based on column user selects
                 if opt == "slider":
@@ -915,9 +944,6 @@ def MastTable(table, **kwargs):
                     vmin, vmax = table_range(table, pending_column)
 
                     py_type = num_py_type(table, pending_column)
-
-                    if pending_value in ("", None):
-                        pending_value = vmin
 
                     label = f"Condition {pending_mode} {pending_value}"
                     solara.Markdown(label)
@@ -978,8 +1004,6 @@ def MastTable(table, **kwargs):
                     value = (
                         {"value": pending_value}
                         if pending_value not in ("", None)
-                        else {"value": unique_values[0]}
-                        if unique_values
                         else None
                     )
 
