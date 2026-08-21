@@ -22,7 +22,7 @@ from mast_table.cross_filter_utils import (
 
 
 # register loaded table widgets as they're initialized
-_table_widgets = dict()
+_table_widgets = []
 
 
 @solara.component
@@ -499,8 +499,7 @@ def SelectableTable(
     items_per_page: int = 10,
     on_selected_indices: Optional[Callable[[List[int]], None]] = None,
     drawer_open: bool = True,
-    set_drawer_open=None,
-    **kwargs
+    set_drawer_open=None
 ):
     """An ipyvuetify DataTable with checkbox selection.
 
@@ -527,9 +526,6 @@ def SelectableTable(
 
     set_drawer_open: callable (optional, default is `None)
         Callback to open CrossFilterMenu sidepanel.
-
-    **kwargs
-        Remaining keyword arguments are passed to MastTable.
 
     """
     selected, set_selected = solara.use_state([])
@@ -580,7 +576,7 @@ def SelectableTable(
 
 
 @solara.component
-def MastTableView(table, base_mast_table, **kwargs):
+def MastTableView(table, base_mast_table):
     """Displays selectable table that participates in cross-filtering.
 
     * Incoming cross-filters from other components narrow which rows
@@ -596,9 +592,6 @@ def MastTableView(table, base_mast_table, **kwargs):
 
     base_mast_table : `BaseMastTable`
         BaseMastTable widget to display.
-
-    **kwargs
-        Keyword arguments are passed to SelectableTable.
 
     """
     solara.provide_cross_filter()
@@ -1069,12 +1062,12 @@ def MastTableView(table, base_mast_table, **kwargs):
                     base_mast_table,
                     drawer_open=drawer_open,
                     set_drawer_open=set_drawer_open,
-                    **kwargs
                 )
 
 
-def MastTable(table, **kwargs):
-    """A selectable table that participates in cross-filtering.
+class MastTable:
+    """
+    A selectable table that participates in cross-filtering.
 
     Parameters
     ----------
@@ -1082,15 +1075,10 @@ def MastTable(table, **kwargs):
         A table to load.
 
     **kwargs
-        Keyword arguments are passed to MastTableWrapper.
-    """
-    return MastTableWrapper(table, **kwargs)
+        Keyword arguments are passed to BaseMastTable.
 
+    """
 
-class MastTableWrapper:
-    """
-    Wrapper for MastTable display and BaseMastTable functionality.
-    """
     def __init__(self, table, **kwargs):
         """
         Parameters
@@ -1102,10 +1090,9 @@ class MastTableWrapper:
             Keyword arguments are passed to BaseMastTable and
             MastTableView.
         """
-        _table_widgets[len(_table_widgets)] = self
+        _table_widgets.append(self)
 
         object.__setattr__(self, "_mast_table_source", table)
-        object.__setattr__(self, "_mast_table_kwargs", kwargs)
         object.__setattr__(
             self,
             "widget",
@@ -1144,19 +1131,17 @@ class MastTableWrapper:
             MastTableView(
                 self._mast_table_source,
                 base_mast_table=self.widget,
-                **self._mast_table_kwargs,
             )
         )
 
 
 def get_current_table():
     """
-    Return the last instantiated table widget, create a new
-    one if none exist.
+    Return the last instantiated table widget, warns user
+    if none exist.
     """
-    if len(_table_widgets):
-        latest_table_index = list(_table_widgets.keys())[-1]
-        return _table_widgets[latest_table_index]
+    if _table_widgets:
+        return _table_widgets[-1]
     else:
         warnings.warn(
             "No `mast-table` exists.", UserWarning

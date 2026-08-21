@@ -105,7 +105,7 @@ def serialize(table):
     """
     column_names = table.colnames
 
-    def _replace_nan(value):
+    def replace_nan(value):
         if value.strip().lower() == 'nan':
             value = ''
         return value
@@ -113,7 +113,7 @@ def serialize(table):
     def nan_to_empty_str(column):
         nans_found = re.findall('nan', ''.join(column))
         if len(nans_found):
-            column = [_replace_nan(row) for row in column]
+            column = [replace_nan(row) for row in column]
         return column
 
     formatted_columns = []
