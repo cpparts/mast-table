@@ -1092,15 +1092,11 @@ class MastTable:
         """
         _table_widgets.append(self)
 
-        object.__setattr__(self, "_mast_table_source", table)
-        object.__setattr__(
-            self,
-            "widget",
-            BaseMastTable(
-                table,
-                item_key=col_unique_row_index,
-                **kwargs,
-            ),
+        self._mast_table_source = table
+        self.widget = BaseMastTable(
+            table,
+            item_key=col_unique_row_index,
+            **kwargs,
         )
 
     def __getattr__(self, name):
