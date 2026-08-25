@@ -1140,5 +1140,5 @@ def get_current_table():
         return _table_widgets[-1]
     else:
         warnings.warn(
-            "No `mast-table` exists.", UserWarning
+            "No `MastTable` exists.", UserWarning
         )
