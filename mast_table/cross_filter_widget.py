@@ -1,5 +1,6 @@
 import operator
 from typing import List, Optional, Callable
+import warnings
 
 import functools
 import uuid
@@ -18,6 +19,10 @@ from mast_table.cross_filter_utils import (
     slide_or_select, step_size, build_select_items,
     build_select_filter_preview,
 )
+
+
+# register loaded table widgets as they're initialized
+_table_widgets = []
 
 
 @solara.component
@@ -490,11 +495,11 @@ def CrossFilterSlider(
 @solara.component
 def SelectableTable(
     table,
+    base_mast_table,
     items_per_page: int = 10,
     on_selected_indices: Optional[Callable[[List[int]], None]] = None,
     drawer_open: bool = True,
-    set_drawer_open=None,
-    **kwargs
+    set_drawer_open=None
 ):
     """An ipyvuetify DataTable with checkbox selection.
 
@@ -505,6 +510,9 @@ def SelectableTable(
     ----------
     table : `~astropy.table.Table`
         A table to load.
+
+    base_mast_table : `BaseMastTable`
+        BaseMastTable widget to display.
 
     items_per_page : int (optional, default is 10)
         Number of items to render on each page.
@@ -519,9 +527,6 @@ def SelectableTable(
     set_drawer_open: callable (optional, default is `None)
         Callback to open CrossFilterMenu sidepanel.
 
-    **kwargs
-        Remaining keyword arguments are passed to MastTable.
-
     """
     selected, set_selected = solara.use_state([])
 
@@ -533,42 +538,46 @@ def SelectableTable(
             indices = [item[col_unique_row_index] for item in msg['new']]
             on_selected_indices(indices)
 
-    def func():
-        def on_change(change):
-            set_drawer_open(change["new"])
+    def on_change(change):
+        set_drawer_open(change["new"])
 
-        mt = BaseMastTable(
-            table,
-            item_key=col_unique_row_index,
-            items_per_page=items_per_page,
-            filter_tray_open=drawer_open,
-            **kwargs
-        )
-        mt.observe(on_change, 'filter_tray_open')
-        return mt
+    base_mast_table.items_per_page = items_per_page
+    base_mast_table.filter_tray_open = drawer_open
 
-    mast_table = solara.use_memo(
-        func,
-        [],
-    )
-
-    mast_table.selected_rows = [
-        item for item in mast_table.items
+    base_mast_table.selected_rows = [
+        item for item in base_mast_table.items
         if item[col_unique_row_index] in selected
     ]
-    mast_table.observe(handle_input, 'selected_rows')
+
+    def observe_widget(base_mast_table, on_change, handle_input):
+        base_mast_table.observe(on_change, "filter_tray_open")
+        base_mast_table.observe(handle_input, "selected_rows")
 
     solara.use_effect(
-        lambda: setattr(mast_table, "items", serialize(table)),
-        [table]
+        lambda: observe_widget(
+            base_mast_table,
+            on_change,
+            handle_input,
+        ),
+        [base_mast_table],
     )
 
-    display(mast_table)
+    # update rows when the filtered table changes.
+    solara.use_effect(
+        lambda: setattr(
+            base_mast_table,
+            "items",
+            serialize(table),
+        ),
+        [table],
+    )
+
+    display(base_mast_table)
 
 
 @solara.component
-def MastTable(table, **kwargs):
-    """A selectable table that participates in cross-filtering.
+def MastTableView(table, base_mast_table):
+    """Displays selectable table that participates in cross-filtering.
 
     * Incoming cross-filters from other components narrow which rows
       are shown.
@@ -581,8 +590,8 @@ def MastTable(table, **kwargs):
     table : `~astropy.table.Table`
         A table to load.
 
-    **kwargs
-        Keyword arguments are passed to SelectableTable.
+    base_mast_table : `BaseMastTable`
+        BaseMastTable widget to display.
 
     """
     solara.provide_cross_filter()
@@ -1050,7 +1059,86 @@ def MastTable(table, **kwargs):
                 )
                 SelectableTable(
                     filtered_table,
+                    base_mast_table,
                     drawer_open=drawer_open,
                     set_drawer_open=set_drawer_open,
-                    **kwargs
                 )
+
+
+class MastTable:
+    """
+    A selectable table that participates in cross-filtering.
+
+    Parameters
+    ----------
+    table : `~astropy.table.Table`
+        A table to load.
+
+    **kwargs
+        Keyword arguments are passed to BaseMastTable.
+
+    """
+
+    def __init__(self, table, **kwargs):
+        """
+        Parameters
+        ----------
+        table : `~astropy.table.Table`
+            A table to load.
+
+        **kwargs
+            Keyword arguments are passed to BaseMastTable and
+            MastTableView.
+        """
+        _table_widgets.append(self)
+
+        self._mast_table_source = table
+        self.widget = BaseMastTable(
+            table,
+            item_key=col_unique_row_index,
+            **kwargs,
+        )
+
+    def __getattr__(self, name):
+        return getattr(self.widget, name)
+
+    @property
+    def selected_rows(self):
+        return self.widget.selected_rows
+
+    @selected_rows.setter
+    def selected_rows(self, value):
+        self.widget.selected_rows = value
+
+    @property
+    def selected_rows_table(self):
+        return Table(self.selected_rows)
+
+    @property
+    def items(self):
+        return self.widget.items
+
+    @items.setter
+    def items(self, value):
+        self.widget.items = value
+
+    def _ipython_display_(self):
+        display(
+            MastTableView(
+                self._mast_table_source,
+                base_mast_table=self.widget,
+            )
+        )
+
+
+def get_current_table():
+    """
+    Return the last instantiated table widget, warns user
+    if none exist.
+    """
+    if _table_widgets:
+        return _table_widgets[-1]
+    else:
+        warnings.warn(
+            "No `MastTable` exists.", UserWarning
+        )

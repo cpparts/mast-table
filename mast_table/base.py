@@ -18,13 +18,9 @@ from astroquery.mast import MastMissions
 
 __all__ = [
     'BaseMastTable',
-    'get_current_table',
 ]
 
 col_unique_row_index = '_unique_row_index'
-
-# register loaded table widgets as they're initialized
-_table_widgets = dict()
 
 
 mission_mast_ra_dec_colnames = dict(
@@ -109,28 +105,38 @@ def serialize(table):
     """
     column_names = table.colnames
 
-    def _replace_nan(value):
-        if 'nan' in value:
+    def replace_nan(value):
+        if value.strip().lower() == 'nan':
             value = ''
         return value
 
     def nan_to_empty_str(column):
         nans_found = re.findall('nan', ''.join(column))
         if len(nans_found):
-            column = [_replace_nan(row) for row in column]
+            column = [replace_nan(row) for row in column]
         return column
 
-    formatted_rows = list(zip(*[
-        nan_to_empty_str(
-            table[col].pformat(show_name=False, show_unit=False)
-        )
-        for col in column_names
-    ]))
+    formatted_columns = []
+
+    for col in column_names:
+        if col == col_unique_row_index or table[col].dtype.kind in ("U", "S"):
+            values = [str(value) for value in table[col]]
+        else:
+            values = table[col].pformat(
+                show_name=False,
+                show_unit=False,
+            )
+
+        values = nan_to_empty_str(values)
+        formatted_columns.append(values)
+
+    formatted_rows = zip(*formatted_columns)
 
     serialized = [
         {name: f"{val}" for name, val in zip(column_names, row)}
         for row in formatted_rows
     ]
+
     return serialized
 
 
@@ -256,8 +262,6 @@ class BaseMastTable(VuetifyTemplate):
             column for column in self.headers_avail
             if column != 's_region'
         ]
-
-        _table_widgets[len(_table_widgets)] = self
 
         if mission := validate.detect_mission_or_products(table):
             self.column_descriptions = validate.get_column_descriptions(mission, table)
@@ -422,15 +426,3 @@ def _download_from_mast(product_file_name):
         mission = 'hst'
 
     MastMissions(mission=mission).download_file(product_file_name)
-
-
-def get_current_table():
-    """
-    Return the last instantiated table widget, create a new
-    one if none exist.
-    """
-    if len(_table_widgets):
-        latest_table_index = list(_table_widgets.keys())[-1]
-        return _table_widgets[latest_table_index]
-
-    return BaseMastTable()
