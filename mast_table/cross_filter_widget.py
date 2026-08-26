@@ -596,15 +596,41 @@ def MastTableView(table, base_mast_table):
     """
     solara.provide_cross_filter()
 
-    pending_column, set_pending_column = solara.use_state(
-        table.colnames[0]
-    )
-    pending_value, set_pending_value = solara.use_state("")
-    pending_mode, set_pending_mode = solara.use_state(">=")
     pending_reducer, set_pending_reducer = solara.use_state("AND")
     filter_masks, set_filter_masks = solara.use_state({})
     filters, set_filters = solara.use_state([])
     drawer_open, set_drawer_open = solara.use_state(True)
+
+    # get defaults for "add condition", establish pending accordingly
+    default_column = table.colnames[0]
+    default_opt = slide_or_select(table, default_column)
+    if default_opt == "slider":
+        default_value, _ = table_range(table, default_column)
+    else:
+        unique_values, _ = build_select_items(table[default_column])
+        default_value = unique_values[0] if unique_values else ""
+    default_mode = ">=" if default_opt == "slider" else "=="
+
+    pending, set_pending = solara.use_state({
+        "column": default_column,
+        "value": default_value,
+        "mode": default_mode,
+    })
+    pending_column = pending["column"]
+    pending_value = pending["value"]
+    pending_mode = pending["mode"]
+
+    def set_pending_value(value):
+        set_pending({
+            **pending,
+            "value": value,
+        })
+
+    def set_pending_mode(mode):
+        set_pending({
+            **pending,
+            "mode": mode,
+        })
 
     def add_filter(opt):
         new_filters = filters + [
@@ -617,20 +643,11 @@ def MastTableView(table, base_mast_table):
         ]
         set_filters(new_filters)
 
-        default_column = table.colnames[0]
-        set_pending_column(default_column)
-
-        set_pending_mode(">=")
-
-        opt = slide_or_select(table, default_column)
-        if opt == "slider":
-            vmin, _ = table_range(table, default_column)
-            set_pending_value(vmin)
-        else:
-            unique_values, _ = build_select_items(
-                table[default_column]
-            )
-            set_pending_value(unique_values[0] if unique_values else "")
+        set_pending({
+            "column": default_column,
+            "value": default_value,
+            "mode": default_mode,
+        })
 
     def remove_filter(filter_id):
         set_filters([f for f in filters if f["id"] != filter_id])
@@ -900,18 +917,19 @@ def MastTableView(table, base_mast_table):
 
                 # handling pending val initialization when col changes
                 def on_pending_column_change(column):
-                    set_pending_column(column)
-
                     opt = slide_or_select(table, column)
 
                     if opt == "slider":
-                        vmin, _ = table_range(table, column)
-                        set_pending_value(vmin)
+                        value, _ = table_range(table, column)
                     else:
                         unique_values, _ = build_select_items(table[column])
-                        set_pending_value(
-                            unique_values[0] if unique_values else ""
-                        )
+                        value = unique_values[0] if unique_values else ""
+
+                    set_pending({
+                        "column": column,
+                        "value": value,
+                        "mode": ">=" if opt == "slider" else "==",
+                    })
 
                 v.Autocomplete(
                     label="Column",
@@ -922,17 +940,6 @@ def MastTableView(table, base_mast_table):
 
                 opt = slide_or_select(table, pending_column)
                 fully_masked = False
-
-                # set initial column pending value
-                if pending_value in ("", None):
-                    if opt == "slider":
-                        vmin, vmax = table_range(table, pending_column)
-                        pending_value = vmin
-                    else:
-                        unique_values, fully_masked = build_select_items(
-                            table[pending_column]
-                        )
-                        pending_value = unique_values[0] if unique_values else ""
 
                 # creating slide/select based on column user selects
                 if opt == "slider":
