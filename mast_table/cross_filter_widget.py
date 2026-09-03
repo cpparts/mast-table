@@ -5,20 +5,20 @@ import warnings
 import functools
 import uuid
 
-import numpy as np
 from IPython.display import display
 
 import solara
-from solara.components.cross_filter import Select
 import reacton.ipyvuetify as v
 
 from astropy.table import Table
-from mast_table.base import BaseMastTable, serialize, col_unique_row_index
+from mast_table.base import BaseMastTable, col_unique_row_index
 from mast_table.cross_filter_utils import (
-    operator_map, num_py_type, table_filter_values, table_range,
+    operator_map, table_filter_values, table_range,
     slide_or_select, step_size, build_select_items,
     build_select_filter_preview,
 )
+from mast_table.components.cross_filter_select import Select
+from mast_table.components.cross_filter_input import Input
 
 
 # register loaded table widgets as they're initialized
@@ -103,7 +103,8 @@ def SettingsMenu(
             on_v_model=set_invert,
             label="Invert filter",
             hide_details=True,
-            dense=True,
+            density="compact",
+            color="primary"
         )
 
         if multiple is not None:
@@ -112,7 +113,8 @@ def SettingsMenu(
                 on_v_model=set_multiple,
                 label="Select multiple",
                 hide_details=True,
-                dense=True,
+                density="compact",
+                color="primary"
             )
 
 
@@ -248,9 +250,14 @@ def CrossFilterSelect(
     solara.use_memo(update_filter, dependencies=[filter_values, invert])
 
     value = (
-        [{"value": v} for v in filter_values]
-        if multiple
-        else ({"value": filter_values[0]} if filter_values else None)
+        [item for item in items if item["value"] in filter_values] if multiple
+        else (
+            next(
+                (item for item in items if item["value"] == filter_values[0]),
+                None,
+            )
+            if filter_values else None
+        )
     )
 
     with solara.VBox(classes=classes) as main:
@@ -259,25 +266,17 @@ def CrossFilterSelect(
                 # set styling for compact checkboxes
                 solara.Style(
                     """
-                    .compact-checkboxes .v-input {
-                        margin-bottom: 0px !important;
-                        margin-top: 0px !important;
-                    }
-
-                    .compact-checkboxes .v-input__control {
+                    .compact-checkboxes .v-selection-control {
                         min-height: 24px !important;
+                        padding: 0 !important;
                     }
 
-                    .compact-checkboxes .v-input__slot {
+                    .compact-checkboxes .v-selection-control__wrapper {
+                        height: 24px !important;
+                    }
+
+                    .compact-checkboxes .v-label {
                         margin: 0 !important;
-                        min-height: 24px !important;
-                    }
-
-                    .compact-checkboxes .v-input--selection-controls {
-                        margin-top: 0 !important;
-                        margin-bottom: 0 !important;
-                        padding-top: 0 !important;
-                        padding-bottom: 0 !important;
                     }
                     """
                 )
@@ -297,10 +296,12 @@ def CrossFilterSelect(
                                     [v for v in filter_values if v != value]
                                 )
 
-                        solara.Checkbox(
-                            value=checked,
-                            on_value=toggle_value,
+                        v.Checkbox(
+                            v_model=checked,
+                            on_v_model=toggle_value,
                             label=opt["text"],
+                            density="compact",
+                            hide_details=True,
                         )
 
                     with solara.Row(
@@ -343,7 +344,6 @@ def CrossFilterSelect(
                         f"Too many unique values, will only show the first {max_unique}"
                         if len(value_counts) > max_unique else ""
                     ),
-                    class_="solara-cross-filter-select",
                 )
 
                 # creating settings menu
@@ -399,8 +399,6 @@ def CrossFilterSlider(
 
     vmin, vmax = table_range(table, column)
 
-    py_type = num_py_type(table, column)
-
     def reset():
         if initial_value is not None:
             set_filter_value(initial_value)
@@ -424,25 +422,11 @@ def CrossFilterSlider(
 
         solara.Style(
             """
-            .crossfilter-slider .v-slider__thumb::before {
-                display: none !important;
-            }
-
-            .crossfilter-slider .v-input--is-focused .v-slider__thumb::before {
-                display: none !important;
+            .crossfilter-slider .v-slider {
+                transform: translateY(10px);
             }
             """
         )
-
-        input_args = {
-            "label": None,
-            "continuous_update": False,
-            "style": {
-                "max-width": "50px",
-                "padding-top": "5px",
-                "padding-bottom": "5px"
-            },
-        }
 
         slider_args = {
             "label": "",
@@ -451,35 +435,27 @@ def CrossFilterSlider(
             "step": step_size(vmin, vmax),
             "thumb_label": False,
             "tick_labels": False,
+            "color": "primary",
         }
 
         # creating slider
         with solara.Row(
-            style={"alignItems": "end"},
+            style={"alignItems": "center"},
             classes=["crossfilter-slider"]
         ):
-            if issubclass(py_type, (int, np.integer)):
-                solara.InputInt(
-                    value=filter_value,
-                    on_value=set_filter_value,
-                    **input_args
-                )
-                solara.SliderInt(
-                    value=filter_value,
-                    on_value=set_filter_value,
-                    **slider_args
-                )
-            elif issubclass(py_type, (float, np.floating)):
-                solara.InputFloat(
-                    value=filter_value,
-                    on_value=set_filter_value,
-                    **input_args
-                )
-                solara.SliderFloat(
-                    value=filter_value,
-                    on_value=set_filter_value,
-                    **slider_args
-                )
+            Input.element(
+                value=filter_value,
+                min=vmin,
+                max=vmax,
+                step=step_size(vmin, vmax),
+                on_value=set_filter_value,
+            )
+
+            v.Slider(
+                v_model=filter_value,
+                on_v_model=set_filter_value,
+                **slider_args
+            )
 
         # creating settings menu
         if configurable:
@@ -496,7 +472,6 @@ def CrossFilterSlider(
 def SelectableTable(
     table,
     base_mast_table,
-    items_per_page: int = 10,
     on_selected_indices: Optional[Callable[[List[int]], None]] = None,
     drawer_open: bool = True,
     set_drawer_open=None
@@ -514,9 +489,6 @@ def SelectableTable(
     base_mast_table : `BaseMastTable`
         BaseMastTable widget to display.
 
-    items_per_page : int (optional, default is 10)
-        Number of items to render on each page.
-
     on_selected_indices : callable (optional, default is `None)
         Callback on selected indices.
 
@@ -532,20 +504,21 @@ def SelectableTable(
 
     # Build vuetify column headers from the table
     def handle_input(msg):
-        new_entries = [item[col_unique_row_index] for item in msg['new']]
+        new_entries = msg["new"]
         set_selected(new_entries)
-        if on_selected_indices is not None and len(msg['new']):
-            indices = [item[col_unique_row_index] for item in msg['new']]
+
+        if on_selected_indices is not None and len(new_entries):
+            indices = [int(index) for index in new_entries]
             on_selected_indices(indices)
 
     def on_change(change):
         set_drawer_open(change["new"])
 
-    base_mast_table.items_per_page = items_per_page
     base_mast_table.filter_tray_open = drawer_open
 
     base_mast_table.selected_rows = [
-        item for item in base_mast_table.items
+        item[col_unique_row_index]
+        for item in base_mast_table.items
         if item[col_unique_row_index] in selected
     ]
 
@@ -562,13 +535,9 @@ def SelectableTable(
         [base_mast_table],
     )
 
-    # update rows when the filtered table changes.
+    # updating basemasttable items on filter changes
     solara.use_effect(
-        lambda: setattr(
-            base_mast_table,
-            "items",
-            serialize(table),
-        ),
+        lambda: base_mast_table.update_items(table),
         [table],
     )
 
@@ -720,18 +689,38 @@ def MastTableView(table, base_mast_table):
                         "padding": 0,
                     }
                 ):
-                    solara.Markdown("##Active conditions")
+                    solara.Markdown(
+                        "##Active conditions",
+                        style={
+                            "margin": "0",
+                            "padding": "0",
+                            "line-height": "1",
+                        }
+                    )
                     if len(filters) > 1:
                         solara.Style(
                             """
+                            .custom-toggle {
+                                display: flex !important;
+                                flex: 0 0 auto !important;
+                                width: 100px !important;
+                                min-width: 100px !important;
+                                overflow: hidden !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }
                             .custom-toggle .v-btn {
-                                background-color: transparent# !important;
+                                background-color: #F2F2F2 !important;
                                 color: #00627e !important;
                                 height: 40px !important;
                                 width: 50px !important;
+                                min-width: 50px !important;
+                                max-width: 50px !important;
+                                flex: 0 0 50px !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
                             }
-
-                            .custom-toggle .v-btn.v-item--active {
+                            .custom-toggle .v-btn--active {
                                 background-color: #00627e !important;
                                 color: white !important;
                             }
@@ -752,6 +741,7 @@ def MastTableView(table, base_mast_table):
                                 width: 40px !important;
                                 height: 40px !important;
                                 padding: 0 !important;
+                                transform: translateY(-4px);
                             }
                             """
                         )
@@ -765,19 +755,17 @@ def MastTableView(table, base_mast_table):
                             )
 
                 # creating slide/select for each active condition
-                for i, f in enumerate(filters):
+                for _, f in enumerate(filters):
                     with solara.Row(style={"width": "100%"}):
                         solara.Style(
                             """
                             .filter-card .v-card {
                                 padding: 0 !important;
                             }
-
-                            .filter-card .v-card__text {
+                            .filter-card .v-card-text {
                                 padding: 4px 8px !important;
                             }
-
-                            .filter-card .v-card__actions {
+                            .filter-card .v-card-actions {
                                 padding: 0px 8px !important;
                             }
                             """
@@ -820,6 +808,10 @@ def MastTableView(table, base_mast_table):
                                         font-size: inherit !important;
                                         font-weight: bold !important;
                                         letter-spacing: normal !important;
+                                    }
+                                    .filter-column {
+                                        min-width: 0 !important;
+                                        flex: 1 1 auto !important;
                                     }
                                     """
                                 )
@@ -936,6 +928,9 @@ def MastTableView(table, base_mast_table):
                     items=column_names,
                     v_model=pending_column,
                     on_v_model=on_pending_column_change,
+                    density="compact",
+                    bg_color="white",
+                    item_color="#00627e"
                 )
 
                 opt = slide_or_select(table, pending_column)
@@ -950,7 +945,10 @@ def MastTableView(table, base_mast_table):
                             "flex-wrap": "wrap",
                         }
                     ):
-                        solara.Markdown("Operator")
+                        solara.Text(
+                            "Operator",
+                            style={"margin": "0", "padding": "0"}
+                        )
 
                         FilterModeButtons(
                             mode=pending_mode,
@@ -959,10 +957,10 @@ def MastTableView(table, base_mast_table):
 
                     vmin, vmax = table_range(table, pending_column)
 
-                    py_type = num_py_type(table, pending_column)
-
-                    label = f"Condition {pending_mode} {pending_value}"
-                    solara.Markdown(label)
+                    solara.Text(
+                        f"Condition {pending_mode} {pending_value}",
+                        style={"margin": "0", "padding": "0"},
+                    )
 
                     table_filtered = table[
                         combined_mask
@@ -970,37 +968,41 @@ def MastTableView(table, base_mast_table):
                     comparison = operator_map[pending_mode]
                     slider_mask = comparison(table_filtered[pending_column], pending_value)
 
-                    if issubclass(py_type, (int, np.integer)):
-                        solara.SliderInt(
-                            label="",
-                            value=int(pending_value),
-                            min=int(vmin),
-                            max=int(vmax),
-                            step=step_size(vmin, vmax),
-                            on_value=set_pending_value,
-                            thumb_label=False,
-                            tick_labels=False,
-                        )
+                    slider_args = {
+                        "label": "",
+                        "min": vmin,
+                        "max": vmax,
+                        "step": step_size(vmin, vmax),
+                        "thumb_label": False,
+                        "tick_labels": False,
+                        "color": "primary",
+                    }
 
-                    elif issubclass(py_type, (float, np.floating)):
-                        solara.SliderFloat(
-                            label="",
-                            value=float(pending_value),
-                            min=float(vmin),
-                            max=float(vmax),
-                            step=step_size(vmin, vmax),
-                            on_value=set_pending_value,
-                            thumb_label=False,
-                            tick_labels=False,
-                        )
-
-                    solara.Markdown(
-                        (
-                            f"<div style='font-size: 12px; text-align: right;'>"
-                            f"{len(table_filtered[slider_mask])} of {len(table_filtered)} "
-                            "after filtering</div>"
-                        )
+                    v.Slider(
+                        v_model=pending_value,
+                        on_v_model=set_pending_value,
+                        **slider_args,
                     )
+
+                    with solara.Row(
+                        style={
+                            "width": "100%",
+                            "justify-content": "flex-end",
+                            "margin": "0",
+                            "padding": "0",
+                        }
+                    ):
+                        solara.Text(
+                            (
+                                f"{len(table_filtered[slider_mask])} of "
+                                f"{len(table_filtered)} after filtering"
+                            ),
+                            style={
+                                "font-size": "12px",
+                                "margin": "0",
+                                "padding": "0",
+                            },
+                        )
                 else:
                     unique_values, fully_masked = build_select_items(
                         table[pending_column]
@@ -1017,11 +1019,10 @@ def MastTableView(table, base_mast_table):
                         table_filtered=table_filtered,
                     )
 
-                    value = (
-                        {"value": pending_value}
-                        if pending_value not in ("", None)
-                        else None
-                    )
+                    value = next(
+                        (item for item in items if item["value"] == pending_value),
+                        None,
+                    ) if pending_value not in ("", None) else None
 
                     def set_pending_select_value(selection):
                         if selection is None:
@@ -1043,7 +1044,6 @@ def MastTableView(table, base_mast_table):
                             f"Too many unique values, will only show the first {max_unique}"
                             if len(value_counts) > max_unique else ""
                         ),
-                        class_="solara-cross-filter-select",
                     )
 
                 with solara.Row(justify="end"):
@@ -1115,11 +1115,13 @@ class MastTable:
 
     @selected_rows.setter
     def selected_rows(self, value):
+        if value and isinstance(value[0], dict):
+            value = [item[col_unique_row_index] for item in value]
         self.widget.selected_rows = value
 
     @property
     def selected_rows_table(self):
-        return Table(self.selected_rows)
+        return self.table[[int(value) for value in self.widget.selected_rows]]
 
     @property
     def items(self):

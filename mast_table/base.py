@@ -1,24 +1,22 @@
-
 import os
 import re
 import warnings
 
-from traitlets import List, Unicode, Bool, Int, Dict, Any, observe
-from ipypopout import PopoutButton
+from traitlets import List, Unicode, Bool, Int, Dict, observe
 from ipyvuetify import VuetifyTemplate
-from ipywidgets.widgets import widget_serialization
 
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-from astropy.table import Table
 
 from mast_table import validate
 from astroquery.mast import MastMissions
 
+
 __all__ = [
     'BaseMastTable',
 ]
+
 
 col_unique_row_index = '_unique_row_index'
 
@@ -31,65 +29,15 @@ mission_mast_ra_dec_colnames = dict(
 )
 
 
-def _format_value(value, fmt):
-    """
-    Apply an astropy ``Column.info.format`` spec to a single ``value``.
-
-    Supports new-style format specs (e.g. ``'.3f'``), printf-style specs
-    (e.g. ``'%.3f'``), and callables. Falls back to the raw value if the
-    format cannot be applied. NaN values are returned as an empty string
-    so the UI shows a blank cell instead of ``'nan'``.
-    """
-    if fmt is None:
-        return value
-    try:
-        if isinstance(value, float) and np.isnan(value):
-            return ''
-    except (TypeError, ValueError):
-        pass
-    if callable(fmt):
-        try:
-            return fmt(value)
-        except Exception:
-            return value
-    try:
-        return format(value, fmt)
-    except (ValueError, TypeError):
-        pass
-    try:
-        return fmt % value
-    except (ValueError, TypeError):
-        return value
-
-
-def _json_safe(value):
-    """
-    Convert a single cell ``value`` to a JSON-safe representation for the
-    frontend, with no per-column precision logic. Per-column precision is
-    handled separately via :func:`_format_value` driven by
-    ``Column.info.format``.
-    """
-    if isinstance(value, SkyCoord):
-        return value.to_string('hmsdms', precision=4)
-    if isinstance(value, u.Quantity):
-        if value.isscalar and np.isnan(value.value):
-            return ''
-        if value.isscalar:
-            return f"{value.value} {value.unit.to_string()}"
-        return {"value": value.value.tolist(), "unit": str(value.unit)}
-    if isinstance(value, np.floating):
-        v = float(value)
-        return '' if np.isnan(v) else v
-    if isinstance(value, float) and np.isnan(value):
-        return ''
-    if isinstance(value, np.bool_):
-        return bool(value)
-    if hasattr(value, 'tolist'):
-        try:
-            return value.tolist()
-        except (TypeError, ValueError):
-            pass
-    return value
+known_unique_mast_table_cols = [
+    'fileSetName',  # data products from astroquery.mast.MastMissions
+    'source_id',    # Gaia
+    'MatchID',      # Hubble Source Catalog
+    'objID',        # PanSTARRS,
+    'product_key',  # list_products queries
+    'obs_id',       # astroquery.mast.Observations,
+    'sci_data_set_name',  # HST
+]
 
 
 def serialize(table):
@@ -140,44 +88,30 @@ def serialize(table):
     return serialized
 
 
-known_unique_mast_table_cols = [
-    'fileSetName',  # data products from astroquery.mast.MastMissions
-    'source_id',    # Gaia
-    'MatchID',      # Hubble Source Catalog
-    'objID',        # PanSTARRS,
-    'product_key',  # list_products queries
-    'obs_id',       # astroquery.mast.Observations,
-    'sci_data_set_name',  # HST
-]
-
-
 class BaseMastTable(VuetifyTemplate):
     """
-    Table widget for observation queries from Mission MAST.
+    Base table widget for queries from MAST.
     """
-    template_file = __file__, "mast_table.vue"
+    template_file = __file__, "base.vue"
 
     items = List().tag(sync=True)
+    headers = List().tag(sync=True)
     headers_visible = List().tag(sync=True)
     headers_avail = List().tag(sync=True)
     show_if_empty = Bool(True).tag(sync=True)
     show_rowselect = Bool(True).tag(sync=True)
     selected_rows = List().tag(sync=True)
-    column_descriptions = List().tag(sync=True)
-    multiselect = Bool(True).tag(sync=True)
-    items_per_page = Int(5).tag(sync=True)
-    show_tooltips = Bool(False).tag(sync=True)
+    show_tooltips = Bool(True).tag(sync=True)
     menu_open = Bool(False).tag(sync=True)
-    clear_btn_lbl = Unicode('Clear Table').tag(sync=True)
-    popout_button = Any().tag(sync=True, **widget_serialization)
     enable_load_in_app = Bool(False).tag(sync=True)
     mission = Unicode(allow_none=True).tag(sync=True)
     filter_tray_open = Bool(True).tag(sync=True)
-
-    # Server-side pagination traitlets
+    # pagination traitlets
+    items_per_page = Int(10).tag(sync=True)
     server_pagination = Bool(True).tag(sync=True)
     server_items_length = Int(0).tag(sync=True)
     table_options = Dict({}).tag(sync=True)
+    sort_by = List([]).tag(sync=True)
 
     # item_key is a column of the table with unique values
     # for each row, enabling selection of the row by lookup
@@ -187,14 +121,15 @@ class BaseMastTable(VuetifyTemplate):
     row_select_callbacks = []
 
     def __init__(
-            self,
-            table,
-            app=None,
-            update_viewport=True,
-            unique_column=None,
-            ra_column=None,
-            dec_column=None,
-            **kwargs):
+        self,
+        table,
+        app=None,
+        update_viewport=True,
+        unique_column=None,
+        ra_column=None,
+        dec_column=None,
+        **kwargs
+    ):
         """
         Parameters
         ----------
@@ -237,41 +172,53 @@ class BaseMastTable(VuetifyTemplate):
 
         super().__init__(**kwargs)
 
-        self.popout_button = PopoutButton(self)
         self.table = table
         self.table[col_unique_row_index] = np.arange(len(table))
         self.app = app
 
+        # serialization
         if not self.table_options:
             self.table_options = {'page': 1, 'itemsPerPage': self.items_per_page}
 
         self._all_items = serialize(self.table)
         self.server_items_length = len(self._all_items)
         self._push_current_page()
+
         columns = self.table.colnames
 
-        self._set_item_key(columns, unique_column)
+        if not self.item_key:
+            self._set_item_key(columns, unique_column)
 
+        # headers_avail excludes the unique row index column, and headers_visible
+        # defaults to exclude the `s_region` column (can be selected to dislay in UI)
         self.headers_avail = [
             column for column in columns if column != col_unique_row_index
         ]
-
-        # by default, remove the `s_region`` column
-        # from the visible columns in the widget:
         self.headers_visible = [
-            column for column in self.headers_avail
-            if column != 's_region'
+            column for column in self.headers_avail if column != 's_region'
         ]
+
+        self.column_descriptions = []
 
         if mission := validate.detect_mission_or_products(table):
             self.column_descriptions = validate.get_column_descriptions(mission, table)
 
             # if the user hasn't defined the ra/dec columns, use
-            # the expectated Mission Mast names for this mission:
+            # the expectated MastMissions names for this mission:
             if ra_column is None and dec_column is None:
                 ra_column, dec_column = mission_mast_ra_dec_colnames[mission]
 
-        # if the ra/dec columns are available in the table:
+        # create headers with expected vuetify3 formatting and descriptions
+        self.headers = [
+            {
+                "title": name,
+                "key": name,
+                "description": self._get_header_description(name)
+            }
+            for name in table.colnames
+        ]
+
+        # conditional updating of MastAladin app target based on ra/dec
         if (
                 ra_column in columns and
                 dec_column in columns and
@@ -296,6 +243,12 @@ class BaseMastTable(VuetifyTemplate):
             return
         self._push_current_page()
 
+    def update_items(self, table):
+        """Update the table data and refresh the current page."""
+        self._all_items = serialize(table)
+        self.server_items_length = len(self._all_items)
+        self._push_current_page()
+
     def _push_current_page(self):
         """Push only the current page slice of ``_all_items`` to ``items``."""
         if not self.server_pagination:
@@ -304,12 +257,24 @@ class BaseMastTable(VuetifyTemplate):
         opts = self.table_options or {}
         page = opts.get('page', 1)
         per_page = opts.get('itemsPerPage', self.items_per_page)
+
+        items = list(self._all_items)
+        # apply sorting before pagination
+        if self.sort_by:
+            sort = self.sort_by[0]
+            key = sort["key"]
+            reverse = sort["order"] == "desc"
+            items.sort(
+                key=lambda item: item.get(key),
+                reverse=reverse,
+            )
+        self.server_items_length = len(items)
         if per_page == -1:
-            self.items = list(self._all_items)
+            self.items = items
             return
         start = (page - 1) * per_page
         end = start + per_page
-        self.items = self._all_items[start:end]
+        self.items = items[start:end]
 
     def _set_item_key(self, table_columns, item_key, n_rows_slow=10e6):
         """
@@ -360,6 +325,12 @@ class BaseMastTable(VuetifyTemplate):
                 f"item_key '{item_key}' not found in table columns: {table_columns}"
             )
 
+    def _get_header_description(self, name):
+        for entry in self.column_descriptions:
+            if entry["name"] == name:
+                return entry["description"]
+        return None
+
     @observe('selected_rows')
     def _on_row_selection(self, msg={}):
         for func in self.row_select_callbacks:
@@ -370,7 +341,7 @@ class BaseMastTable(VuetifyTemplate):
         """
         `~astropy.table.Table` of only the selected rows.
         """
-        return Table(self.selected_rows)
+        return self.table[[int(value) for value in self.selected_rows]]
 
     def vue_open_selected_rows_in_jdaviz(self, *args):
         import jdaviz as jd
