@@ -257,9 +257,9 @@ def test_build_select_filter_preview():
 
     # filtered table
     mask = test_table["test1"] == "a"
-    test_table_filtered = test_table[mask]
+    test_filtered_table = test_table[mask]
     items, value_counts = utils.build_select_filter_preview(
-        test_table, "test1", table_filtered=test_table_filtered
+        test_table, "test1", filtered_table=test_filtered_table
     )
     assert isinstance(items, list)
     assert isinstance(value_counts, Table)
