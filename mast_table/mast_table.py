@@ -4,6 +4,7 @@ import uuid
 import warnings
 
 from typing import List, Optional, Callable
+import numpy as np
 
 from IPython.display import display
 import ipywidgets as widgets
@@ -62,8 +63,86 @@ class MastTable:
         self.sidecar = kwargs.get("sidecar", None)
         self.popout_button = None
 
+        self.filter_mask = np.ones(len(self.table), dtype=bool)
+        self._selected_mask = np.zeros(len(self.table), dtype=bool)
+        self._updating_selection = False
+
+        self._selection_listeners = []
+        self._filter_listeners = []
+
+        self.widget.observe(self._on_selection_change, names="selected_rows")
+
     def __getattr__(self, name):
         return getattr(self.widget, name)
+
+    def add_selection_listener(self, callback):
+        self._selection_listeners.append(callback)
+
+    def add_filter_listener(self, callback):
+        self._filter_listeners.append(callback)
+
+    def remove_selection_listener(self, callback):
+        if callback in self._selection_listeners:
+            self._selection_listeners.remove(callback)
+
+    def remove_filter_listener(self, callback):
+        if callback in self._filter_listeners:
+            self._filter_listeners.remove(callback)
+
+    def _notify_listeners(self, listeners, mask):
+        for callback in listeners:
+            callback(mask.copy())
+
+    def _validate_mask(self, mask, length):
+        mask = np.asarray(mask)
+        if mask.dtype.kind != 'b':
+            raise TypeError("Invalid mask provided. Must be a boolean array.")
+        if mask.shape != (length,):
+            raise ValueError("Mask length must match the table.")
+        return mask
+
+    def _on_selection_change(self, change):
+        if self._updating_selection:
+            return
+
+        mask = np.zeros(len(self.table), dtype=bool)
+        mask[np.asarray(change["new"], dtype=int)] = True
+
+        self._selected_mask = mask
+        self._notify_listeners(self._selection_listeners, mask)
+
+    def _set_filter_mask(self, mask):
+        self.filter_mask = mask
+        self._update_selection()
+        self._notify_listeners(self._filter_listeners, self.filter_mask)
+
+    @property
+    def selected_mask(self):
+        return self._selected_mask.copy()
+
+    @selected_mask.setter
+    def selected_mask(self, mask):
+        self.set_selected_mask(mask)
+
+    def set_selected_mask(self, mask, notify=True):
+        self._selected_mask = self._validate_mask(mask, len(self.table))
+        self._update_selection()
+
+        if notify:
+            self._notify_listeners(
+                self._selection_listeners,
+                self._selected_mask,
+            )
+
+    def _update_selection(self):
+        mask = self._selected_mask & self.filter_mask
+        self._updating_selection = True
+        try:
+            self.widget.selected_rows = [
+                str(i) for i in np.flatnonzero(mask)
+            ]
+        finally:
+            self._updating_selection = False
 
     @property
     def selected_rows(self):
@@ -73,11 +152,14 @@ class MastTable:
     def selected_rows(self, value):
         if value and isinstance(value[0], dict):
             value = [item[col_unique_row_index] for item in value]
-        self.widget.selected_rows = value
+
+        mask = np.zeros(len(self.table), dtype=bool)
+        mask[np.asarray(value, dtype=int)] = True
+        self.selected_mask = mask
 
     @property
     def selected_rows_table(self):
-        return self.table[[int(value) for value in self.widget.selected_rows]]
+        return self.table[self._selected_mask]
 
     @property
     def items(self):
@@ -93,9 +175,10 @@ class MastTable:
     def _ipython_display_(self):
         display(
             MastTableView(
-                self._mast_table_source,
+                self.table,
                 base_mast_table=self.widget,
                 on_popout_button=self._set_popout_button,
+                on_filter_mask=self._set_filter_mask,
             )
         )
 
@@ -192,6 +275,69 @@ class MastTable:
         else:
             raise ValueError("Invalid loc provided. Must be 'inline', 'sidecar', or 'popout'.")
 
+    def select(self, arg=None, column=None):
+        """
+        Select rows in MastTable based on Boolean mask, row indices, or column values.
+
+        Parameters
+        ----------
+        arg : array of {bool, int}, int, list, slice, float, str
+            If a Boolean mask, selects rows that are `True`.
+            When ``column = None``, selects the rows by specified index value(s) or slices.
+            When column is defined, selects the column values that match arg.
+
+        column : str, optional (default None)
+            The column corresponding to specific values you want to select on. Selects
+            rows from MastTable whose values for ``column`` match the value(s) specified
+            by ``arg``.
+
+        """
+
+        if arg is None:
+            selection_mask = np.zeros(len(self.table), dtype=bool)
+
+        elif isinstance(arg, np.ndarray):
+            if arg.dtype.kind == 'b':
+                selection_mask = arg
+            elif arg.dtype.kind == 'i':
+                selection_mask = np.zeros(len(self.table), dtype=bool)
+                selection_mask[arg] = True
+            else:
+                raise TypeError(
+                    "Invalid arg type provided. Array must be a Boolean mask or an "
+                    "array of indices."
+                )
+
+        elif column is not None:
+            if column not in self.table.colnames:
+                raise ValueError(
+                    f"Invalid column name provided. ``{column}`` does not exist in the table."
+                )
+            if not (np.isscalar(arg) or isinstance(arg, list)):
+                raise TypeError(
+                    "Invalid arg type provided. Must be int, list, float, or str."
+                )
+
+            values = np.atleast_1d(arg)
+            selection_mask = np.isin(self.table[column], values)
+
+        else:
+            if isinstance(arg, int):
+                idxs = [arg]
+            elif isinstance(arg, list):
+                idxs = arg
+            elif isinstance(arg, slice):
+                idxs = range(*arg.indices(len(self.table)))
+            else:
+                raise TypeError(
+                    "Invalid arg type provided. Must be int, list, or slice."
+                )
+
+            selection_mask = np.zeros(len(self.table), dtype=bool)
+            selection_mask[idxs] = True
+
+        self.selected_mask = selection_mask
+
 
 def get_current_table():
     """
@@ -239,14 +385,14 @@ def SelectableTable(
         Callback to open CrossFilterMenu sidepanel.
 
     """
-    selected, set_selected = solara.use_state([])
+    _, set_selected = solara.use_state(list(base_mast_table.selected_rows))
 
     # Build vuetify column headers from the table
     def handle_input(msg):
         new_entries = msg["new"]
         set_selected(new_entries)
 
-        if on_selected_indices is not None and len(new_entries):
+        if on_selected_indices is not None:
             indices = [int(index) for index in new_entries]
             on_selected_indices(indices)
 
@@ -254,12 +400,6 @@ def SelectableTable(
         set_drawer_open(change["new"])
 
     base_mast_table.filter_tray_open = drawer_open
-
-    base_mast_table.selected_rows = [
-        item[col_unique_row_index]
-        for item in base_mast_table.items
-        if item[col_unique_row_index] in selected
-    ]
 
     def observe_widget(base_mast_table, on_change, handle_input):
         base_mast_table.observe(on_change, "filter_tray_open")
@@ -274,9 +414,19 @@ def SelectableTable(
         [base_mast_table],
     )
 
-    # updating BaseMastTable items on filter changes
+    # update BaseMastTable items and selections on filter changes
+    def update_items(table):
+        base_mast_table.update_items(table)
+        valid_idxs = set(
+            np.asarray(table[col_unique_row_index]).astype(str)
+        )
+        base_mast_table.selected_rows = [
+            key for key in base_mast_table.selected_rows
+            if key in valid_idxs
+        ]
+
     solara.use_effect(
-        lambda: base_mast_table.update_items(table),
+        lambda: update_items(table),
         [table],
     )
 
@@ -285,7 +435,12 @@ def SelectableTable(
 
 @preserve_docstring
 @solara.component
-def MastTableView(table, base_mast_table, on_popout_button=None):
+def MastTableView(
+    table,
+    base_mast_table,
+    on_popout_button=None,
+    on_filter_mask=None,
+):
     """
     Displays selectable table with cross-filtering.
 
@@ -299,6 +454,10 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
 
     on_popout_button: callable, optional
         Callback to expose popout button. Default is None.
+
+    on_filter_mask : callable (optional, default is `None`)
+        Callback to expose `filter_mask` from cross-filtering.
+        Default is None
 
     """
     solara.provide_cross_filter()
@@ -387,17 +546,29 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
     ]
 
     if not active_masks:
-        combined_mask = None
+        filter_mask = np.ones(
+            len(table),
+            dtype=bool
+        )
     elif pending_reducer == "AND":
-        combined_mask = functools.reduce(
+        filter_mask = functools.reduce(
             operator.and_,
             active_masks
         )
     else:
-        combined_mask = functools.reduce(
+        filter_mask = functools.reduce(
             operator.or_,
             active_masks
         )
+
+    solara.use_effect(
+        lambda: (
+            on_filter_mask(filter_mask)
+            if on_filter_mask is not None
+            else None
+        ),
+        [filter_mask, on_filter_mask],
+    )
 
     solara.lab.theme.themes.light.primary = "#00617e"
     solara.lab.theme.themes.dark.primary = "#013b4d"
@@ -630,16 +801,16 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                                     ]
 
                                     if not other_masks:
-                                        table_filtered = table
+                                        filtered_table = table
                                     elif pending_reducer == "AND":
-                                        table_filtered = table[
+                                        filtered_table = table[
                                             functools.reduce(
                                                 operator.and_,
                                                 other_masks
                                             )
                                         ]
                                     else:
-                                        table_filtered = table[
+                                        filtered_table = table[
                                             functools.reduce(
                                                 operator.or_,
                                                 other_masks
@@ -653,7 +824,7 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                                         set_mask=set_mask,
                                         set_filter_mode=on_mode_change,
                                         initial_values=initial_val,
-                                        table_filtered=table_filtered
+                                        filtered_table=filtered_table
                                     )
 
                 if not len(filters):
@@ -697,6 +868,8 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                 opt = slide_or_select(table, pending_column)
                 fully_masked = False
 
+                filtered_table = table[filter_mask]
+
                 # creating slide/select based on column user selects
                 if opt == "slider":
                     with solara.Row(
@@ -723,11 +896,8 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                         style={"margin": "0", "padding": "0"},
                     )
 
-                    table_filtered = table[
-                        combined_mask
-                    ] if combined_mask is not None else table
                     comparison = operator_map[pending_mode]
-                    slider_mask = comparison(table_filtered[pending_column], pending_value)
+                    slider_mask = comparison(filtered_table[pending_column], pending_value)
 
                     slider_args = {
                         "label": "",
@@ -768,8 +938,8 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                     ):
                         solara.Text(
                             (
-                                f"{len(table_filtered[slider_mask])} of "
-                                f"{len(table_filtered)} after filtering"
+                                f"{len(filtered_table[slider_mask])} of "
+                                f"{len(filtered_table)} after filtering"
                             ),
                             style={
                                 "font-size": "12px",
@@ -782,15 +952,13 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                         table[pending_column]
                     )
 
-                    table_filtered = table[combined_mask] if combined_mask is not None else None
-
                     max_unique = 100
 
                     items, value_counts = build_select_filter_preview(
                         table,
                         pending_column,
                         max_unique=max_unique,
-                        table_filtered=table_filtered,
+                        filtered_table=filtered_table,
                     )
 
                     if pending_value not in ("", None):
@@ -816,7 +984,7 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                         return_object=True,
                         multiple=False,
                         filtered=pending_value is not None,
-                        count=len(table_filtered) if table_filtered is not None else len(table),
+                        count=len(filtered_table),
                     )
 
                     if len(value_counts) > max_unique:
@@ -841,12 +1009,7 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                         solara.Markdown("(Column fully masked)")
 
             with solara.Column(style="flex: 1; overflow: auto; min-height: 0"):
-                filtered_table = (
-                    table[combined_mask]
-                    if combined_mask is not None
-                    else table
-                )
-
+                filtered_table = table[filter_mask]
                 SelectableTable(
                     filtered_table,
                     base_mast_table,

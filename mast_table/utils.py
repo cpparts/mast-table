@@ -120,7 +120,7 @@ def build_select_filter_preview(
     table,
     column,
     max_unique=100,
-    table_filtered=None,
+    filtered_table=None,
 ):
     """
     Determines the items and value_counts for a given column used to generate
@@ -131,7 +131,7 @@ def build_select_filter_preview(
     - `table`: The astropy Table to filter.
     - `column`: The column to filter on.
     - `max_unique`: The maximum number of unique values to show in the dropdown.
-    - `table_filtered`: The filtered astropy Table.
+    - `filtered_table`: The filtered astropy Table.
 
     Returns
     -------
@@ -141,9 +141,9 @@ def build_select_filter_preview(
     value_counts = table_value_count(table, column, limit=max_unique + 1)
     value_counts.rename_column('count', 'count_max')
 
-    if table_filtered:
+    if filtered_table:
         value_counts_filtered = table_value_count(
-            table_filtered, column, limit=max_unique + 1
+            filtered_table, column, limit=max_unique + 1
         )
 
         if len(value_counts_filtered):

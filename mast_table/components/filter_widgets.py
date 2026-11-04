@@ -182,7 +182,7 @@ def CrossFilterSelect(
     filter_id: str,
     set_mask: Callable,
     set_filter_mode: Callable,
-    table_filtered: Table,
+    filtered_table: Table,
     initial_values=None,
     max_unique: int = 100,
     multiple: bool = False,
@@ -205,7 +205,7 @@ def CrossFilterSelect(
         Callback for updating filter's mask.
     set_filter_mode : callable
         Callback for updating filter mode
-    table_filtered : `astropy.table.Table`
+    filtered_table : `astropy.table.Table`
         Table after filtering.
     initial_values : list, optional
         The initial values to set as selected. Default is None.
@@ -251,7 +251,7 @@ def CrossFilterSelect(
         table,
         column,
         max_unique=max_unique,
-        table_filtered=table_filtered
+        filtered_table=filtered_table
     )
 
     def set_values_and_filter(values):
@@ -385,7 +385,7 @@ def CrossFilterSelect(
                     return_object=True,
                     multiple=multiple,
                     filtered=len(filter_values) > 0,
-                    count=len(table_filtered),
+                    count=len(filtered_table),
                     messages=(
                         f"Too many unique values, will only show the first {max_unique}"
                         if len(value_counts) > max_unique else ""
@@ -464,7 +464,7 @@ def CrossFilterSlider(
 
     def update_filter():
         filter = None
-        if filter_value:
+        if filter_value is not None:
             filter = operator_map[mode](table[column], filter_value)
         set_mask(filter_id, filter)
 
