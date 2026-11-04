@@ -1125,7 +1125,37 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                 )
                 # Popout button overlays the BaseMastTable
                 if target_model_id.value:
+                    solara.Style(
+                        """
+                        .popout-button {
+                            position: relative;
+                        }
+
+                        .popout-button::after {
+                            content: "Display in a new window";
+                            position: absolute;
+                            top: calc(100% + 6px);
+                            right: 0;
+                            padding: 6px 10px;
+                            background-color: #424242;
+                            color: white;
+                            border-radius: 4px;
+                            font-size: 14px;
+                            white-space: nowrap;
+                            opacity: 0;
+                            visibility: hidden;
+                            pointer-events: none;
+                            z-index: 10000;
+                        }
+
+                        .popout-button:hover::after {
+                            opacity: 1;
+                            visibility: visible;
+                        }
+                        """
+                    )
                     with solara.Column(
+                        classes=["popout-button"],
                         style={
                             "position": "absolute",
                             "top": "25px",
