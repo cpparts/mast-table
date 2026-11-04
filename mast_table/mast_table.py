@@ -990,7 +990,7 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                     vmin, vmax = table_range(table, pending_column)
 
                     solara.Text(
-                        f"{pending_column} {pending_mode} {pending_value}",
+                        f"{pending_column} {pending_mode}",
                         style={"margin": "0", "padding": "0"},
                     )
 
@@ -1010,11 +1010,24 @@ def MastTableView(table, base_mast_table, on_popout_button=None):
                         "color": "primary",
                     }
 
-                    v.Slider(
-                        v_model=pending_value,
-                        on_v_model=set_pending_value,
-                        **slider_args,
-                    )
+                    with solara.Row(
+                        style={
+                            "display": "flex",
+                            "alignItems": "bottom"
+                        },
+                        classes=["crossfilter-slider"]
+                    ):
+                        Input.element(
+                            value=pending_value,
+                            on_value=set_pending_value,
+                            **slider_args,
+                        )
+
+                        v.Slider(
+                            v_model=pending_value,
+                            on_v_model=set_pending_value,
+                            **slider_args
+                        )
 
                     with solara.Row(
                         style={
