@@ -6,6 +6,7 @@
     :max="max"
     :step="step"
     @change="onChange"
+    @wheel.prevent
     class="crossfilter-input"
   />
 </template>
