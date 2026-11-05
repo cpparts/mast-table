@@ -522,9 +522,9 @@ def SelectableTable(
         set_drawer_open(change["new"])
 
     base_mast_table.filter_tray_open = drawer_open
-    valid_inds = np.asarray(table[col_unique_row_index]).astype(str).tolist()
+    valid_idxs = np.asarray(table[col_unique_row_index]).astype(str).tolist()
     base_mast_table.selected_rows = [
-        key for key in selected if key in valid_inds
+        key for key in selected if key in valid_idxs
     ]
 
     def observe_widget(base_mast_table, on_change, handle_input):
@@ -576,7 +576,7 @@ def MastTableView(
         Callback to expose popout button.
 
     on_filter_mask : callable (optional, default is `None`)
-        Callback to expose combined mask from cross-filtering.
+        Callback to expose `filter_mask` from cross-filtering.
 
     """
     solara.provide_cross_filter()
@@ -987,6 +987,8 @@ def MastTableView(
                 opt = slide_or_select(table, pending_column)
                 fully_masked = False
 
+                filtered_table = table[filter_mask]
+
                 # creating slide/select based on column user selects
                 if opt == "slider":
                     with solara.Row(
@@ -1013,7 +1015,6 @@ def MastTableView(
                         style={"margin": "0", "padding": "0"},
                     )
 
-                    filtered_table = table[filter_mask]
                     comparison = operator_map[pending_mode]
                     slider_mask = comparison(filtered_table[pending_column], pending_value)
 
@@ -1070,8 +1071,6 @@ def MastTableView(
                         table[pending_column]
                     )
 
-                    filtered_table = table[filter_mask]
-
                     max_unique = 100
 
                     items, value_counts = build_select_filter_preview(
@@ -1104,7 +1103,7 @@ def MastTableView(
                         return_object=True,
                         multiple=False,
                         filtered=pending_value is not None,
-                        count=len(filtered_table) if filtered_table is not None else len(table),
+                        count=len(filtered_table),
                     )
 
                     if len(value_counts) > max_unique:
@@ -1474,18 +1473,18 @@ class MastTable:
 
         else:
             if isinstance(arg, int):
-                inds = [arg]
+                idxs = [arg]
             elif isinstance(arg, list):
-                inds = arg
+                idxs = arg
             elif isinstance(arg, slice):
-                inds = range(*arg.indices(len(self.table)))
+                idxs = range(*arg.indices(len(self.table)))
             else:
                 raise TypeError(
                     "Invalid arg type provided. Must be int, list, or slice."
                 )
 
             selection_mask = np.zeros(len(self.table), dtype=bool)
-            selection_mask[inds] = True
+            selection_mask[idxs] = True
 
         self.selected_mask = selection_mask
 
