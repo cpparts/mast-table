@@ -420,7 +420,7 @@ def CrossFilterSlider(
 
     def update_filter():
         filter = None
-        if filter_value:
+        if filter_value is not None:
             filter = operator_map[mode](table[column], filter_value)
         set_mask(filter_id, filter)
 
@@ -507,7 +507,7 @@ def SelectableTable(
         Callback to open CrossFilterMenu sidepanel.
 
     """
-    selected, set_selected = solara.use_state([])
+    _, set_selected = solara.use_state(list(base_mast_table.selected_rows))
 
     # Build vuetify column headers from the table
     def handle_input(msg):
@@ -522,10 +522,6 @@ def SelectableTable(
         set_drawer_open(change["new"])
 
     base_mast_table.filter_tray_open = drawer_open
-    valid_idxs = np.asarray(table[col_unique_row_index]).astype(str).tolist()
-    base_mast_table.selected_rows = [
-        key for key in selected if key in valid_idxs
-    ]
 
     def observe_widget(base_mast_table, on_change, handle_input):
         base_mast_table.observe(on_change, "filter_tray_open")
@@ -1249,13 +1245,21 @@ class MastTable:
     def add_filter_listener(self, callback):
         self._filter_listeners.append(callback)
 
+    def remove_selection_listener(self, callback):
+        if callback in self._selection_listeners:
+            self._selection_listeners.remove(callback)
+
+    def remove_filter_listener(self, callback):
+        if callback in self._filter_listeners:
+            self._filter_listeners.remove(callback)
+
     def _notify_listeners(self, listeners, mask):
         for callback in listeners:
             callback(mask.copy())
 
     def _validate_mask(self, mask, length):
         mask = np.asarray(mask)
-        if not isinstance(mask, np.ndarray) or mask.dtype.kind != 'b':
+        if mask.dtype.kind != 'b':
             raise TypeError("Invalid mask provided. Must be a boolean array.")
         if mask.shape != (length,):
             raise ValueError("Mask length must match the table.")
@@ -1278,7 +1282,7 @@ class MastTable:
 
     @property
     def selected_mask(self):
-        return self._selected_mask
+        return self._selected_mask.copy()
 
     @selected_mask.setter
     def selected_mask(self, mask):
@@ -1436,14 +1440,14 @@ class MastTable:
 
         Parameters
         ----------
-        arg : mask, int, list, slice, float, str
+        arg : numpy.ndarray[bool], int, list, slice, float, str
             If a Boolean mask, selects rows that are `True`.
             When ``column = None``, selects the rows by specified index value(s) or slices.
             When column is defined, selects the column values that match arg.
 
         column : str, optional (default None)
             The column corresponding to specific values you want to select on. Selects
-            rows from MastTable whose values for ``column`` match the values(s) specified
+            rows from MastTable whose values for ``column`` match the value(s) specified
             by ``args``.
 
         """
@@ -1463,12 +1467,12 @@ class MastTable:
                 raise ValueError(
                     f"Invalid column name provided. ``{column}`` does not exist in the table."
                 )
-            if type(arg) not in [int, list, float, str]:
+            if not (np.isscalar(arg) or isinstance(arg, list)):
                 raise TypeError(
                     "Invalid arg type provided. Must be int, list, float, or str."
                 )
 
-            values = arg if isinstance(arg, list) else [arg]
+            values = np.atleast_1d(arg)
             selection_mask = np.isin(self.table[column], values)
 
         else:
