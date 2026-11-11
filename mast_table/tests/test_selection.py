@@ -78,6 +78,13 @@ def test_select(mast_observation_table):
     assert mast_table.selected_rows == ["0", "1", "2"]
     assert all(mast_table._selected_mask[0:3])
 
+    # by array of inds
+    test_array = np.array([1, 2, 3])
+    mast_table.select(test_array)
+    assert all(mast_table.selected_rows_table == mast_observation_table[1:4])
+    assert mast_table.selected_rows == ["1", "2", "3"]
+    assert all(mast_table._selected_mask[1:4])
+
     # test reset selections with no args
     mast_table.select()
     assert mast_table.selected_rows == []
@@ -93,7 +100,7 @@ def test_invalid_select(mast_observation_table):
         mast_table.select("fake")
 
     # invalid array
-    with pytest.raises(TypeError, match="Invalid arg type provided. Mask must be a Boolean array."):
+    with pytest.raises(TypeError, match="Array must be a Boolean mask or"):
         mast_table.select(np.ones(5))
 
     # non-existent column

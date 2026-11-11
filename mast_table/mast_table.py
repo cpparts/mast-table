@@ -1440,7 +1440,7 @@ class MastTable:
 
         Parameters
         ----------
-        arg : numpy.ndarray[bool], int, list, slice, float, str
+        arg : array of {bool, int}, int, list, slice, float, str
             If a Boolean mask, selects rows that are `True`.
             When ``column = None``, selects the rows by specified index value(s) or slices.
             When column is defined, selects the column values that match arg.
@@ -1448,7 +1448,7 @@ class MastTable:
         column : str, optional (default None)
             The column corresponding to specific values you want to select on. Selects
             rows from MastTable whose values for ``column`` match the value(s) specified
-            by ``args``.
+            by ``arg``.
 
         """
 
@@ -1456,11 +1456,16 @@ class MastTable:
             selection_mask = np.zeros(len(self.table), dtype=bool)
 
         elif isinstance(arg, np.ndarray):
-            if arg.dtype.kind != 'b':
+            if arg.dtype.kind == 'b':
+                selection_mask = arg
+            elif arg.dtype.kind == 'i':
+                selection_mask = np.zeros(len(self.table), dtype=bool)
+                selection_mask[arg] = True
+            else:
                 raise TypeError(
-                    "Invalid arg type provided. Mask must be a Boolean array."
+                    "Invalid arg type provided. Array must be a Boolean mask or an "
+                    "array of indices."
                 )
-            selection_mask = arg
 
         elif column is not None:
             if column not in self.table.colnames:
