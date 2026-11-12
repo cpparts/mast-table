@@ -514,7 +514,7 @@ def SelectableTable(
         new_entries = msg["new"]
         set_selected(new_entries)
 
-        if on_selected_indices is not None and len(new_entries):
+        if on_selected_indices is not None:
             indices = [int(index) for index in new_entries]
             on_selected_indices(indices)
 
@@ -536,9 +536,19 @@ def SelectableTable(
         [base_mast_table],
     )
 
-    # updating BaseMastTable items on filter changes
+    # update BaseMastTable items and selections on filter changes
+    def update_items(table):
+        base_mast_table.update_items(table)
+        valid_idxs = set(
+            np.asarray(table[col_unique_row_index]).astype(str)
+        )
+        base_mast_table.selected_rows = [
+            key for key in base_mast_table.selected_rows
+            if key in valid_idxs
+        ]
+
     solara.use_effect(
-        lambda: base_mast_table.update_items(table),
+        lambda: update_items(table),
         [table],
     )
 
