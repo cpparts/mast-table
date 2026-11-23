@@ -841,13 +841,17 @@ def MastTableView(
 
                 # handling pending val initialization when col changes
                 def on_pending_column_change(column):
-                    opt = slide_or_select(table, column)
+                    if column is not None:
+                        opt = slide_or_select(table, column)
+                        if opt == "slider":
+                            value, _ = table_range(table, column)
+                        else:
+                            unique_values, _ = build_select_items(table[column])
+                            value = unique_values[0] if unique_values else ""
 
-                    if opt == "slider":
-                        value, _ = table_range(table, column)
                     else:
-                        unique_values, _ = build_select_items(table[column])
-                        value = unique_values[0] if unique_values else ""
+                        opt = None
+                        value = None
 
                     set_pending({
                         "column": column,
@@ -862,10 +866,15 @@ def MastTableView(
                     on_v_model=on_pending_column_change,
                     density="compact",
                     bg_color="transparent",
-                    item_color="light-dark(#00617e, #013b4d)"
+                    item_color="light-dark(#00617e, #013b4d)",
+                    autocomplete="off",
                 )
 
-                opt = slide_or_select(table, pending_column)
+                if pending_column is not None:
+                    opt = slide_or_select(table, pending_column)
+                else:
+                    opt = None
+
                 fully_masked = False
 
                 filtered_table = table[filter_mask]
@@ -947,7 +956,7 @@ def MastTableView(
                                 "padding": "0",
                             },
                         )
-                else:
+                elif opt == "select":
                     unique_values, fully_masked = build_select_items(
                         table[pending_column]
                     )
@@ -1001,7 +1010,7 @@ def MastTableView(
                         label="Apply filter",
                         icon_name="mdi-plus",
                         on_click=lambda *args: add_filter(opt),
-                        disabled=fully_masked,
+                        disabled=fully_masked or opt is None,
                         style={"background-color": "light-dark(#00617e, #013b4d)", "color": "white"}
                     )
                 if fully_masked:
