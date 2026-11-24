@@ -33,10 +33,17 @@
 </template>
 
 <style>
+
 .cross-filter-selection {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* block jdaviz css leak */
+.cross-filter-menu .v-list-item__content {
+  display: block !important;
+}
+
 </style>
